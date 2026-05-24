@@ -1,0 +1,9 @@
+*.xdb
+*.xdb[0-9]*
+*.db
+*.db[0-9]*
+release/
+dist/
+*.zip
+__pycache__/
+*.pyc

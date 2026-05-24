@@ -1,0 +1,169 @@
+{
+  "version": "2026.05.24.1",
+  "mode": "mirror",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.24.1/",
+  "files": [
+    {
+      "path": "db/configs/ai.db0",
+      "asset_name": "db__configs__ai.db0",
+      "size": 14937,
+      "sha256": "1b0186b0681d59fc4451279f90083336bc96064faef6660d9623e551ac561156"
+    },
+    {
+      "path": "db/configs/configs.xdb0",
+      "asset_name": "db__configs__configs.xdb0",
+      "size": 6453529,
+      "sha256": "3482d7b00823b5473f0bcb78706d49dd512d5c24f952b04b7a6f61df1b6b296e"
+    },
+    {
+      "path": "db/configs/configs_anthology.xdb0",
+      "asset_name": "db__configs__configs_anthology.xdb0",
+      "size": 12496512,
+      "sha256": "b84f97c1726118eb5e212406f7e7c21c7399b3622faa38e7d0034d46492c8c5d"
+    },
+    {
+      "path": "db/configs/configs_deanon_artefact.xdb0",
+      "asset_name": "db__configs__configs_deanon_artefact.xdb0",
+      "size": 263200316,
+      "sha256": "1a3610053e2c76de23c3d38fe715a71207d7e3a267f77e19caccd8184d90aa3d"
+    },
+    {
+      "path": "db/configs/configs_gnra.xdb0",
+      "asset_name": "db__configs__configs_gnra.xdb0",
+      "size": 5343,
+      "sha256": "337c0986ea12c822fb3f788f383457cdc04aa64980df86f84519d4d0897777b9"
+    },
+    {
+      "path": "db/configs/scripts.xdb0",
+      "asset_name": "db__configs__scripts.xdb0",
+      "size": 1633486,
+      "sha256": "0c1a37068b3f183530ce3aa601a7586a568eac412cd6c0e180999d0623f422ad"
+    },
+    {
+      "path": "db/configs/scripts_anthology.xdb0",
+      "asset_name": "db__configs__scripts_anthology.xdb0",
+      "size": 1341583,
+      "sha256": "829a4c28a952b4640ba97de0c7a234268363f9eaaa0de5fe907765210c1446f0"
+    },
+    {
+      "path": "db/configs/scripts_smart_covers_cs.xdb0",
+      "asset_name": "db__configs__scripts_smart_covers_cs.xdb0",
+      "size": 46669,
+      "sha256": "fe664cc14cb522eccc90399be765b8f39100def09db78e50c97689a697246055"
+    },
+    {
+      "path": "db/configs/spawns.xdb0",
+      "asset_name": "db__configs__spawns.xdb0",
+      "size": 46408402,
+      "sha256": "6e873055cf53acbbe7fd4f5a7a92eb5ad090774ad3f8eff3096aecaa80b3d358"
+    },
+    {
+      "path": "db/mods/00_modded_exes_gamedata.db0",
+      "asset_name": "db__mods__00_modded_exes_gamedata.db0",
+      "size": 556303,
+      "sha256": "05ab91e688887ecd5f070fbdb36e81352db9a7f8dbbe95f1d99b65a2da6af3e8"
+    },
+    {
+      "path": "db/mods/[ANT] Mod Configuration Menu.xdb0",
+      "asset_name": "db__mods__[ANT] Mod Configuration Menu.xdb0",
+      "size": 111187,
+      "sha256": "6bd89d3e280acde32227f3f067b18c17f142e7ee36dea7180bfdf85c3d8784b4"
+    },
+    {
+      "path": "db/mods/[ANT] Sota ui for Anthology.xdb0",
+      "asset_name": "db__mods__[ANT] Sota ui for Anthology.xdb0",
+      "size": 147514026,
+      "sha256": "176d0de1f5f6d06903648c8a0d5d27195bb58b1d13da37d77c7af7e472f4be85"
+    },
+    {
+      "path": "db/mods/alarm_wake_up.xdb0",
+      "asset_name": "db__mods__alarm_wake_up.xdb0",
+      "size": 33779,
+      "sha256": "05d72d05af95421321f97540b05f97d0082e099ce2622f1f9372188012e0891b"
+    },
+    {
+      "path": "db/mods/Anomaly_Real_Distant_Mutants_Sounds.xdb0",
+      "asset_name": "db__mods__Anomaly_Real_Distant_Mutants_Sounds.xdb0",
+      "size": 19543118,
+      "sha256": "01001c4c7a423e5bb3218560251d086438eb750b02e5a6e324d232db45e56ab2"
+    },
+    {
+      "path": "db/mods/Anthology_particles.xdb0",
+      "asset_name": "db__mods__Anthology_particles.xdb0",
+      "size": 252559545,
+      "sha256": "88b4369ceeb774c771900751bd09258fbe6d5f2bc81ae54f400e4048290a3165"
+    },
+    {
+      "path": "db/mods/Chernobyl Relay Chat.xdb0",
+      "asset_name": "db__mods__Chernobyl Relay Chat.xdb0",
+      "size": 2366196,
+      "sha256": "cfd84a14a7ae251644a313a947e6deaf90300b66581024e4cf9cf2da0a1898cb"
+    },
+    {
+      "path": "db/mods/Combat_ai_scripts.xdb0",
+      "asset_name": "db__mods__Combat_ai_scripts.xdb0",
+      "size": 31701,
+      "sha256": "5497b3abd63adea17511c58fc9ad0b49190ccfc2895d09c44fa528cd06eb2b8e"
+    },
+    {
+      "path": "db/mods/IntroScreenAddon.xdb0",
+      "asset_name": "db__mods__IntroScreenAddon.xdb0",
+      "size": 1490757,
+      "sha256": "78eb7724c4ac44614061960ab9584ac4a25d7c43405f104df17b95a3f92bd357"
+    },
+    {
+      "path": "db/mods/Inventory_Antifreeze.xdb0",
+      "asset_name": "db__mods__Inventory_Antifreeze.xdb0",
+      "size": 336297,
+      "sha256": "51befd21d71235bfbcd43261329e19524e9110ed86e752297216c3fcdf74bf4f"
+    },
+    {
+      "path": "db/mods/monolith_prisoners.xdb0",
+      "asset_name": "db__mods__monolith_prisoners.xdb0",
+      "size": 6760,
+      "sha256": "448c1d94562a6f33c47ab680bd02cd7f0041aea65942532d665f4473faa2a9f7"
+    },
+    {
+      "path": "db/mods/S2_Ambience_Overhaul_Unofficial.xdb0",
+      "asset_name": "db__mods__S2_Ambience_Overhaul_Unofficial.xdb0",
+      "size": 218116789,
+      "sha256": "837fae2755c045348dac2cd4f8716b33ec3f93fce9f2d6e95a788345b4fbaab7"
+    },
+    {
+      "path": "db/mods/shaders_anthology.xdb1",
+      "asset_name": "db__mods__shaders_anthology.xdb1",
+      "size": 190897,
+      "sha256": "50fd9a5462bc4d3fc0decb52e677b46d07c55a345212b0fbcd61be016373aa02"
+    },
+    {
+      "path": "db/mods/shaders_look_better.xdb0",
+      "asset_name": "db__mods__shaders_look_better.xdb0",
+      "size": 23795,
+      "sha256": "08cbbbbcc37bda059ec1619646cbf311149b785da78854ae433d435e3a8610ea"
+    },
+    {
+      "path": "db/mods/Spatial_Audio_Rework.xdb0",
+      "asset_name": "db__mods__Spatial_Audio_Rework.xdb0",
+      "size": 761766,
+      "sha256": "0d4e5bb3700db1a2f97a2a689000342ea41e5b4b53d325e0e0f2d45efb88bb47"
+    },
+    {
+      "path": "db/mods/tactical_light_presets.xdb0",
+      "asset_name": "db__mods__tactical_light_presets.xdb0",
+      "size": 151716,
+      "sha256": "22199422eb8da5da1ed18e1a8a3b3318c140c238d39139d7b49723ae970c03ff"
+    },
+    {
+      "path": "db/mods/trader_autoinject.xdb0",
+      "asset_name": "db__mods__trader_autoinject.xdb0",
+      "size": 3141,
+      "sha256": "abad348f034327b69bd83452e9245455b0c3638777120c961fb59b12a7e89d67"
+    },
+    {
+      "path": "db/mods/zhopa.xdb0",
+      "asset_name": "db__mods__zhopa.xdb0",
+      "size": 228753,
+      "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
+    }
+  ]
+}
