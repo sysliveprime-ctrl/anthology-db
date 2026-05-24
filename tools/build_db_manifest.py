@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 ALLOWED_DIRS = {"configs", "mods"}
+DEFAULT_BASE_URL = "https://raw.githubusercontent.com/sysliveprime-ctrl/anthology-db/main/"
 
 
 def is_db_archive(path: Path) -> bool:
@@ -32,11 +33,8 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def asset_name(rel_path: str) -> str:
-    return rel_path.replace("/", "__").replace("\\", "__")
-
-
-def build_manifest(db_root: Path, version: str, base_url: str) -> dict:
+def build_manifest(repo_root: Path, version: str, base_url: str) -> dict:
+    db_root = repo_root / "db"
     files = []
     for part in sorted(ALLOWED_DIRS):
         root = db_root / part
@@ -50,7 +48,6 @@ def build_manifest(db_root: Path, version: str, base_url: str) -> dict:
             files.append(
                 {
                     "path": rel,
-                    "asset_name": asset_name(rel),
                     "size": stat.st_size,
                     "sha256": sha256_file(path),
                 }
@@ -65,16 +62,16 @@ def build_manifest(db_root: Path, version: str, base_url: str) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build Anthology DB launcher update manifest.")
-    parser.add_argument("--db-root", required=True, help="Path to the game db folder.")
+    parser.add_argument("--repo-root", default=".", help="Path to the anthology-db repository root.")
     parser.add_argument("--version", required=True)
-    parser.add_argument("--base-url", required=True)
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--out", default="db_version.json")
     args = parser.parse_args()
 
-    db_root = Path(args.db_root).expanduser().resolve()
-    if not db_root.exists():
-        raise FileNotFoundError(db_root)
-    manifest = build_manifest(db_root, args.version, args.base_url)
+    repo_root = Path(args.repo_root).expanduser().resolve()
+    if not (repo_root / "db").exists():
+        raise FileNotFoundError(repo_root / "db")
+    manifest = build_manifest(repo_root, args.version, args.base_url)
     out = Path(args.out).expanduser().resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

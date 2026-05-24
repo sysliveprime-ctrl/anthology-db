@@ -1,0 +1,4 @@
+*.xdb filter=lfs diff=lfs merge=lfs -text
+*.xdb[0-9]* filter=lfs diff=lfs merge=lfs -text
+*.db filter=lfs diff=lfs merge=lfs -text
+*.db[0-9]* filter=lfs diff=lfs merge=lfs -text

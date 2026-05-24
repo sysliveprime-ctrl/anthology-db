@@ -1,8 +1,7 @@
 # Anthology DB Update Channel
 
-This repository stores the small update manifest for Anthology DB archives.
-Large `.xdb` and `.db` files should be uploaded as GitHub Release assets, not
-committed to Git.
+This repository stores ready-packed Anthology DB archives and the small launcher
+update manifest. Large `.xdb` and `.db` files are tracked with Git LFS.
 
 The launcher reads `db_version.json`, removes local extra DB archives in mirror
 mode, and downloads only files whose size or SHA-256 hash does not match.
@@ -15,39 +14,25 @@ mode, and downloads only files whose size or SHA-256 hash does not match.
   "mode": "mirror",
   "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.24.1/",
   "files": [
-    {
-      "path": "db/configs/configs_anthology.xdb0",
-      "asset_name": "configs_anthology.xdb0",
-      "size": 12496896,
-      "sha256": "..."
-    }
+    {"path": "db/configs/configs_anthology.xdb0", "size": 12496896, "sha256": "..."}
   ]
 }
 ```
 
-## Build Manifest
+## Workflow
+
+1. Pack DB archives yourself with the correct X-Ray packer.
+2. Put the finished files under `db/configs/` and `db/mods/`.
+3. Rebuild `db_version.json`.
+4. Commit and push.
+
+Example:
 
 ```powershell
-py -3 .\tools\build_db_manifest.py `
-  --db-root "D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db" `
-  --version 2026.05.24.1 `
-  --base-url "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.24.1/" `
-  --out .\db_version.json
-```
-
-Upload every listed archive as a GitHub Release asset using its `asset_name`.
-
-To stage release assets after building the manifest:
-
-```powershell
-py -3 .\tools\stage_release_assets.py `
-  --db-root "D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db" `
-  --manifest .\db_version.json `
-  --out .\release\2026.05.24.1
-```
-
-With GitHub CLI installed and authenticated, create/upload the release:
-
-```powershell
-.\tools\upload_release.ps1 -Version 2026.05.24.1
+Copy-Item "D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs\*.xdb*" .\db\configs\
+Copy-Item "D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods\*.xdb*" .\db\mods\
+py -3 .\tools\build_db_manifest.py --version 2026.05.24.1
+git add .gitattributes db db_version.json
+git commit -m "Update DB archives"
+git push
 ```
