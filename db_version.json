@@ -1,7 +1,7 @@
 {
-  "version": "2026.05.25.4",
+  "version": "2026.05.25.5",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.25.4/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.25.5/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -42,8 +42,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1339681,
-      "sha256": "88bbeca14c41fd097deeb7019ba94f2c8404c0d37bcede6dc1252ac785c40f2f"
+      "size": 1339924,
+      "sha256": "7a5e0825dd875152a2067611347090b219d27052e72d0e78535dfad0885643ce"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -166,5 +166,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "DB update."
+  "notes": "DB patch update."
 }
