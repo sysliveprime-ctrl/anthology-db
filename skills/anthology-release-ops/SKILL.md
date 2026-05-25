@@ -59,6 +59,9 @@ Players do not need Git. Git is only our publishing transport.
 - Modpack stores installed file paths in `.launcher_update_state.json`.
 - Modpack updater now removes previously tracked files when they disappear from
   the new `main.zip`.
+- Modpack `version.json` may include `removed_files`. These are explicit
+  repo-relative cleanup paths generated from Git history during release; players
+  do not need Git for this cleanup.
 - R.A.K weapon pack folders are manual/local and must be preserved even if they
   are absent from `main.zip`.
 - The modpack repo ignores `*R.A.K Weapon Pack Adaptation Global A.N.T.H.O.L.O.G.Y*/**`;
@@ -90,10 +93,18 @@ py -3 E:\dev\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_r
 Does:
 
 - updates `version.json`
+- auto-fills `removed_files` with deleted tracked `gamedata/configs` and
+  `gamedata/scripts` files that are absent from current Git
 - commits tracked modpack changes
 - pushes `sysliveprime-ctrl/anthology-mo2-modpack` `main`
 
 The launcher installs from `main.zip`; no release asset is needed.
+
+Preview cleanup list without publishing:
+
+```powershell
+py -3 E:\dev\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_release_ops.py modpack-removed
+```
 
 Before publishing, inspect `git status --short --branch`. R.A.K paths should not
 be tracked. Test files named `anthology_release_*` must not be present.

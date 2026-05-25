@@ -31,6 +31,10 @@ LAUNCHER_REPO = "sysliveprime-ctrl/AnthologyLauncher"
 DB_REPO = "sysliveprime-ctrl/anthology-db"
 SOURCE_REPO = "sysliveprime-ctrl/anthology-source"
 LAUNCHER_ASSET = "AnomalyLauncher.exe"
+MODPACK_ALLOWED_PARTS = {"configs", "scripts"}
+MODPACK_PRESERVE_MARKERS = (
+    "r.a.k weapon pack adaptation",
+)
 
 
 class ReleaseError(RuntimeError):
@@ -201,6 +205,74 @@ def update_launcher_version(root: Path, version: str, notes: str) -> None:
     write_json(meta, data)
 
 
+def is_modpack_update_path(path: str) -> bool:
+    candidate = Path(path.replace("\\", "/"))
+    if candidate.is_absolute():
+        return False
+    parts = candidate.parts
+    if not parts or any(part in ("", ".", "..") for part in parts):
+        return False
+    lowered = [part.lower() for part in parts]
+    if "gamedata" not in lowered:
+        return False
+    index = lowered.index("gamedata")
+    return index + 1 < len(parts) and lowered[index + 1] in MODPACK_ALLOWED_PARTS
+
+
+def should_preserve_modpack_path(path: str) -> bool:
+    normalized = Path(path.replace("\\", "/")).as_posix().casefold()
+    return any(marker in normalized for marker in MODPACK_PRESERVE_MARKERS)
+
+
+def deleted_modpack_files(root: Path) -> list[str]:
+    deleted = set()
+    output = run(
+        [
+            "git",
+            "-c",
+            "core.quotePath=false",
+            "log",
+            "--diff-filter=D",
+            "--name-only",
+            "--pretty=format:",
+            "--",
+            ":(glob)**/gamedata/configs/**",
+            ":(glob)**/gamedata/scripts/**",
+        ],
+        cwd=root,
+        capture=True,
+    )
+    for line in output.splitlines():
+        rel = line.strip().replace("\\", "/")
+        if not rel or not is_modpack_update_path(rel) or should_preserve_modpack_path(rel):
+            continue
+        if not (root / rel).exists():
+            deleted.add(Path(rel).as_posix())
+
+    status_output = run(
+        [
+            "git",
+            "-c",
+            "core.quotePath=false",
+            "status",
+            "--short",
+            "--",
+            ":(glob)**/gamedata/configs/**",
+            ":(glob)**/gamedata/scripts/**",
+        ],
+        cwd=root,
+        capture=True,
+    )
+    for line in status_output.splitlines():
+        if not line.startswith(" D ") and not line.startswith("D  "):
+            continue
+        rel = line[3:].strip().replace("\\", "/")
+        if rel and is_modpack_update_path(rel) and not should_preserve_modpack_path(rel):
+            deleted.add(Path(rel).as_posix())
+
+    return sorted(deleted, key=str.casefold)
+
+
 def command_launcher(args: argparse.Namespace) -> None:
     root = Path(args.path or LAUNCHER_DIR)
     version = args.version or default_version()
@@ -245,10 +317,29 @@ def command_modpack(args: argparse.Namespace) -> None:
     data["version"] = version
     data["notes"] = notes
     data.setdefault("zip_url", "https://github.com/sysliveprime-ctrl/anthology-mo2-modpack/archive/refs/heads/main.zip")
+    removed = deleted_modpack_files(root)
+    if removed:
+        data["removed_files"] = removed
+    else:
+        data.pop("removed_files", None)
     write_json(meta, data)
 
     commit = commit_push(root, args.message or f"Bump modpack to {version}", args.dry_run)
-    print(json.dumps({"type": "modpack", "version": version, "commit": commit}, ensure_ascii=False, indent=2))
+    print(json.dumps(
+        {"type": "modpack", "version": version, "commit": commit, "removed_files": len(removed)},
+        ensure_ascii=False,
+        indent=2,
+    ))
+
+
+def command_modpack_removed(args: argparse.Namespace) -> None:
+    root = Path(args.path or MODPACK_DIR)
+    files = deleted_modpack_files(root)
+    print(json.dumps(
+        {"type": "modpack-removed", "count": len(files), "removed_files": files},
+        ensure_ascii=False,
+        indent=2,
+    ))
 
 
 def command_source(args: argparse.Namespace) -> None:
@@ -346,6 +437,10 @@ def build_parser() -> argparse.ArgumentParser:
     modpack = sub.add_parser("modpack", help="Publish MO2 modpack update")
     add_common(modpack)
     modpack.set_defaults(func=command_modpack)
+
+    modpack_removed = sub.add_parser("modpack-removed", help="Show deleted MO2 modpack files that will be cleaned on clients")
+    modpack_removed.add_argument("--path", help="Override project/repo path")
+    modpack_removed.set_defaults(func=command_modpack_removed)
 
     source = sub.add_parser("source", help="Commit and push Anthology source update")
     add_common(source)
