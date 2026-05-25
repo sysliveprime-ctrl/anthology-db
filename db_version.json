@@ -1,7 +1,7 @@
 {
-  "version": "2026.05.25.3",
+  "version": "2026.05.25.4",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.25.3/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.25.4/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -18,8 +18,8 @@
     {
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
-      "size": 12496512,
-      "sha256": "b84f97c1726118eb5e212406f7e7c21c7399b3622faa38e7d0034d46492c8c5d"
+      "size": 12512376,
+      "sha256": "580892cae27a7791734d1f3c8778e474f73602f9d814a33b3a56d50ee986baa8"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -42,8 +42,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1341583,
-      "sha256": "829a4c28a952b4640ba97de0c7a234268363f9eaaa0de5fe907765210c1446f0"
+      "size": 1339681,
+      "sha256": "88bbeca14c41fd097deeb7019ba94f2c8404c0d37bcede6dc1252ac785c40f2f"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -166,5 +166,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "Тестовые DB-архивы релиза удалены из манифеста DB."
+  "notes": "DB update."
 }
