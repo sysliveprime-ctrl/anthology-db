@@ -27,25 +27,76 @@ mode, and downloads only files whose size or SHA-256 hash does not match.
 ## Workflow
 
 1. Pack DB archives yourself with the correct X-Ray packer.
-2. Put the finished files under `db/configs/` and `db/mods/`.
-3. Rebuild `db_version.json` and stage release assets.
-4. Commit and push the manifest.
-5. Upload release assets.
+2. Put the finished files in the live game DB folders.
+3. Rebuild `db_version.json` from the live game DB folders.
+4. Commit and push the manifest from this repository.
+5. Upload release assets from the live game DB folders.
+
+DB asset sources:
+
+```text
+D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs
+D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods
+```
 
 Example:
 
 ```powershell
-Copy-Item "D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs\*.xdb*" .\db\configs\
-Copy-Item "D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs\*.db*" .\db\configs\
-Copy-Item "D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods\*.xdb*" .\db\mods\
-Copy-Item "D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods\*.db*" .\db\mods\
+py -3 .\skills\anthology-release-ops\scripts\anthology_release_ops.py workgit --version 2026.05.24.1 --notes "Updated DB archives"
+```
 
-py -3 .\tools\build_db_manifest.py --version 2026.05.24.1
-py -3 .\tools\stage_release_assets.py --manifest .\db_version.json --out .\release\2026.05.24.1
+The MO2 modpack source is:
 
-git add .gitignore README.md db_version.json tools
-git commit -m "Update DB manifest"
-git push
+```text
+D:\Games\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods
+```
 
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\upload_release.ps1 -Version 2026.05.24.1
+The launcher repo lives inside this workspace as a separate Git checkout:
+
+```text
+E:\dev\Anthology-Work-Git\projects\AnthologyLauncher
+```
+
+The Anthology source snapshot is a separate repo used only for source updates:
+
+```text
+E:\dev\anomaly-codex-main\ai_workspace\Source_Anthology
+```
+
+It pushes to `sysliveprime-ctrl/anthology-source` and does not participate in
+launcher builds, launcher update checks, or DB release uploads.
+
+## Client Updates
+
+Players do not need Git. GitHub repositories are used only by the maintainer to
+publish update metadata and downloadable archives.
+
+The launcher update flow is:
+
+```text
+launcher_version.json -> latest release AnomalyLauncher.exe
+version.json          -> anthology-mo2-modpack main.zip
+db_version.json       -> anthology-db release assets
+```
+
+`anthology-source` is not part of the launcher update flow.
+
+## Codex Release Skill
+
+The Anthology release helper skill source of truth is stored in this repository
+at:
+
+```text
+skills/anthology-release-ops
+```
+
+Do not develop or maintain this skill under `C:\Users\parti\.codex\skills`.
+That folder may contain only a small discovery pointer for Codex. All scripts,
+release rules, docs, and fixes belong in `E:\dev\Anthology-Work-Git`.
+
+After changing this repo copy, refresh only the local discovery pointer if
+needed:
+
+```powershell
+Copy-Item .\skills\anthology-release-ops\SKILL.md "$env:USERPROFILE\.codex\skills\anthology-release-ops\SKILL.md" -Force
 ```

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Anthology Release Ops"
+  short_description: "Automate Anthology launcher, modpack, and Work Git publishing."
+  default_prompt: "Use $anthology-release-ops to publish the requested Anthology launcher, modpack, or Work Git update."

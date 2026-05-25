@@ -1,13 +1,19 @@
 {
-  "version": "2026.05.24.1",
+  "version": "2026.05.25.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.24.1/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.25.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
       "asset_name": "db_configs_ai.db0",
       "size": 14937,
       "sha256": "1b0186b0681d59fc4451279f90083336bc96064faef6660d9623e551ac561156"
+    },
+    {
+      "path": "db/configs/anthology_release_test_empty.db0",
+      "asset_name": "db_configs_anthology_release_test_empty.db0",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "path": "db/configs/configs.xdb0",
@@ -165,5 +171,6 @@
       "size": 228753,
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
-  ]
+  ],
+  "notes": "Release pipeline test: empty DB asset and repository cleanup marker."
 }

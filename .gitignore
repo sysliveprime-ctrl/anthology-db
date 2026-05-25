@@ -1,9 +1,8 @@
 __pycache__/
 *.pyc
-db/**/*.xdb
-db/**/*.xdb[0-9]*
-db/**/*.db
-db/**/*.db[0-9]*
+db/
 release/
 dist/
 *.zip
+projects/AnthologyLauncher/
+safe_backups/
