@@ -12,8 +12,8 @@
     {
       "path": "db/configs/anthology_release_test_empty.db0",
       "asset_name": "db_configs_anthology_release_test_empty.db0",
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      "size": 1,
+      "sha256": "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
     },
     {
       "path": "db/configs/configs.xdb0",
@@ -172,5 +172,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "Release pipeline test: empty DB asset and repository cleanup marker."
+  "notes": "Release pipeline test: tiny DB asset and repository cleanup marker."
 }
