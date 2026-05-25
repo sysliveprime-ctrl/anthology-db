@@ -77,6 +77,7 @@ py -3 E:\dev\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_r
 launcher repo:  E:\dev\Anthology-Work-Git\projects\AnthologyLauncher
 modpack repo:   D:\Games\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods
 engine repo:    E:\dev\xray-monolith
+source repo:    E:\dev\anomaly-codex-main\ai_workspace\Source_Anthology
 ```
 
 Публичные репозитории:
@@ -85,6 +86,10 @@ engine repo:    E:\dev\xray-monolith
 - `sysliveprime-ctrl/anthology-mo2-modpack`
 - `sysliveprime-ctrl/anthology-db`
 - `sysliveprime-ctrl/xray-monolith`
+- `sysliveprime-ctrl/anthology-source`
+
+`anthology-source` хранит source snapshot для сопровождения и ревью. Лаунчер
+его не скачивает и не использует как update channel.
 
 ## Release Helper
 
