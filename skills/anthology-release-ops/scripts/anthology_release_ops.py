@@ -255,6 +255,7 @@ def deleted_modpack_files(root: Path) -> list[str]:
             "-c",
             "core.quotePath=false",
             "status",
+            "-z",
             "--short",
             "--",
             ":(glob)**/gamedata/configs/**",
@@ -263,10 +264,12 @@ def deleted_modpack_files(root: Path) -> list[str]:
         cwd=root,
         capture=True,
     )
-    for line in status_output.splitlines():
-        if not line.startswith(" D ") and not line.startswith("D  "):
+    for entry in status_output.split("\0"):
+        if not entry:
             continue
-        rel = line[3:].strip().replace("\\", "/")
+        if not entry.startswith(" D ") and not entry.startswith("D  "):
+            continue
+        rel = entry[3:].strip().replace("\\", "/")
         if rel and is_modpack_update_path(rel) and not should_preserve_modpack_path(rel):
             deleted.add(Path(rel).as_posix())
 

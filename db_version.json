@@ -1,7 +1,7 @@
 {
-  "version": "2026.05.28.1",
+  "version": "2026.05.28.2",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.28.1/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.28.2/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -166,5 +166,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "DB configs refresh. Mirror cleanup removes old DB archives not present in this manifest."
+  "notes": "DB configs refresh from live Anthology db folders. Mirror cleanup removes old DB archives not present in this manifest."
 }
