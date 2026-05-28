@@ -1,7 +1,7 @@
 {
-  "version": "2026.05.25.5",
+  "version": "2026.05.28.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.25.5/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.28.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -18,8 +18,8 @@
     {
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
-      "size": 12512376,
-      "sha256": "580892cae27a7791734d1f3c8778e474f73602f9d814a33b3a56d50ee986baa8"
+      "size": 12588571,
+      "sha256": "a48efe111168aa240f163f66510dd4eea2a4fd9572d2e4937bbd7e5122191fb9"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -42,8 +42,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1339924,
-      "sha256": "7a5e0825dd875152a2067611347090b219d27052e72d0e78535dfad0885643ce"
+      "size": 1342909,
+      "sha256": "8fe78c55c7777d906eaa9be164dda63abf6cb402b0556d849e6d403e318ab106"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -166,5 +166,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "DB patch update."
+  "notes": "DB configs refresh. Mirror cleanup removes old DB archives not present in this manifest."
 }
