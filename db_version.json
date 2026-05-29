@@ -166,5 +166,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "Anthology DB refresh from live game archives."
+  "notes": "ВАЖНО: после этого обновления нужно начать новую игру. Из-за нового spawn/db старые сохранения могут работать неправильно."
 }
