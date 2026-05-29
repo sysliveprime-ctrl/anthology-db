@@ -1,7 +1,7 @@
 {
-  "version": "2026.05.28.2",
+  "version": "2026.05.29.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.28.2/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.29.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -18,8 +18,8 @@
     {
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
-      "size": 12588571,
-      "sha256": "a48efe111168aa240f163f66510dd4eea2a4fd9572d2e4937bbd7e5122191fb9"
+      "size": 12588698,
+      "sha256": "56e9f2883b9f3efddc32ca7b6477bf1df63bba268d447d1891133ac9820c2c82"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -42,8 +42,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1342909,
-      "sha256": "8fe78c55c7777d906eaa9be164dda63abf6cb402b0556d849e6d403e318ab106"
+      "size": 1344641,
+      "sha256": "999e664e919d113c5afc1c1063436c0a7912a4f0045d898ae46a371db8cbd382"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -54,8 +54,8 @@
     {
       "path": "db/configs/spawns.xdb0",
       "asset_name": "db_configs_spawns.xdb0",
-      "size": 46408402,
-      "sha256": "6e873055cf53acbbe7fd4f5a7a92eb5ad090774ad3f8eff3096aecaa80b3d358"
+      "size": 46450377,
+      "sha256": "b7b56efe07a7852b47d2650a1bcf9132b28206bfed8d4aec8d3c4394e060297a"
     },
     {
       "path": "db/mods/00_modded_exes_gamedata.db0",
@@ -166,5 +166,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "DB configs refresh from live Anthology db folders. Mirror cleanup removes old DB archives not present in this manifest."
+  "notes": "Anthology DB refresh from live game archives."
 }
