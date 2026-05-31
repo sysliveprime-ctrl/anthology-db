@@ -1,7 +1,7 @@
 {
-  "version": "2026.05.29.1",
+  "version": "2026.05.31.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.29.1/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.31.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -18,8 +18,8 @@
     {
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
-      "size": 12588698,
-      "sha256": "56e9f2883b9f3efddc32ca7b6477bf1df63bba268d447d1891133ac9820c2c82"
+      "size": 12841059,
+      "sha256": "75fc18c31ebfe28b3f215ce3ebaee3784f7ae10eeb88ad00d101ce184110e06d"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -42,8 +42,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1344641,
-      "sha256": "999e664e919d113c5afc1c1063436c0a7912a4f0045d898ae46a371db8cbd382"
+      "size": 1359509,
+      "sha256": "3536ea8f268b2cb8a9b5f8d41c05c26e904965794fb128f293736ea317314274"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -166,5 +166,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "ВАЖНО: после этого обновления нужно начать новую игру. Из-за нового spawn/db старые сохранения могут работать неправильно."
+  "notes": "Обновление DB Anthology."
 }
