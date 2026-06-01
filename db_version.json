@@ -1,7 +1,7 @@
 {
-  "version": "2026.05.31.1",
+  "version": "2026.06.01.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.05.31.1/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.01.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -166,5 +166,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "Обновление DB Anthology."
+  "notes": "Правки от Максима!"
 }
