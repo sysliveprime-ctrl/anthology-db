@@ -25,6 +25,7 @@ engine repo:        E:\dev\xray-monolith
 DB manifest repo:   E:\dev\Anthology-Work-Git
 DB asset sources:   D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs
                     D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods
+                    D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0
 ```
 
 Primary helper:
@@ -61,7 +62,10 @@ Players do not need Git. Git is only our publishing transport.
 ## Current Update Semantics
 
 - DB is mirror mode: files absent from `db_version.json` are deleted locally from
-  `db/configs` and `db/mods`.
+  `db/configs` and `db/mods`; the root DB archive
+  `db/shaders_anthology.xdb0` is managed explicitly by the DB channel.
+- `db/mods/00_modded_exes_gamedata.db0` belongs to the engine ZIP, not the DB
+  channel. The launcher preserves it during DB cleanup.
 - Modpack stores installed file paths in `.launcher_update_state.json`.
 - Modpack updater now removes previously tracked files when they disappear from
   the new `main.zip`.
@@ -196,7 +200,8 @@ py -3 E:\dev\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_r
 Does:
 
 - scans live game DB source folders, not copied repo folders
-- writes logical paths `db/configs/...` and `db/mods/...` to `db_version.json`
+- writes logical paths `db/configs/...`, `db/mods/...`, and
+  `db/shaders_anthology.xdb0` to `db_version.json`
 - commits and pushes `sysliveprime-ctrl/anthology-db` `main`
 - creates/updates GitHub Release tag equal to the version
 - uploads DB assets from the live game DB folders

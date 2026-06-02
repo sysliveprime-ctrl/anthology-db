@@ -37,7 +37,11 @@
 - Asset sources:
   - `D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs`
   - `D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods`
-- Manifest paths stay logical: `db/configs/...`, `db/mods/...`
+  - `D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0`
+- Manifest paths stay logical: `db/configs/...`, `db/mods/...`,
+  `db/shaders_anthology.xdb0`
+- `db/mods/00_modded_exes_gamedata.db0` is engine-owned and must not be added
+  back to the DB manifest.
 - Download mode: GitHub Release assets under tag equal to manifest version.
 - Launcher reads the manifest through GitHub contents API first to avoid stale
   raw CDN cache.

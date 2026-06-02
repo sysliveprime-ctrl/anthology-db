@@ -55,7 +55,11 @@ Git игрокам не нужен.
 ```text
 D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs
 D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods
+D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0
 ```
+
+`db/mods/00_modded_exes_gamedata.db0` поставляется через engine update ZIP, а
+не через DB-манифест.
 
 ## Релиз DB
 
