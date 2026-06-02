@@ -1,7 +1,7 @@
 {
-  "version": "2026.06.02.1",
+  "version": "2026.06.02.2",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.02.1/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.02.2/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -18,8 +18,8 @@
     {
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
-      "size": 12850066,
-      "sha256": "9d9f4199e567b247c6d9eafcca36e78a47f62abc43c837906ac06313e4793ca2"
+      "size": 12882582,
+      "sha256": "59f9885a499afc1857ce8df158f1ac55cec9b4e635856afa409a20661ccf1471"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -42,8 +42,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1361091,
-      "sha256": "5fa87146ab5f1386da8aa9496ae51f09f4f4ea6691301c76fd79576e5eb731a7"
+      "size": 1369676,
+      "sha256": "48880895c7e409f447513ffbf5e1f7a47146da843132ce4486f3fc7f9ccd23b6"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -158,7 +158,13 @@
       "asset_name": "db_mods_zhopa.xdb0",
       "size": 228753,
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
+    },
+    {
+      "path": "db/shaders_anthology.xdb0",
+      "asset_name": "db_shaders_anthology.xdb0",
+      "size": 4738953,
+      "sha256": "30ddad80f467e02daa6f4712e87b43869a29d03dd939d0e6e009b24a8ad93c7c"
     }
   ],
-  "notes": "DB update no longer manages engine DB file."
+  "notes": "Added root shaders_anthology DB archive."
 }

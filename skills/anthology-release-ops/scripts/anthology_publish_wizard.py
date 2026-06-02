@@ -36,6 +36,9 @@ DB_SOURCE_DIRS = {
     "configs": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs"),
     "mods": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods"),
 }
+DB_SOURCE_FILES = {
+    "db/shaders_anthology.xdb0": LIVE_GAME_DIR / "db" / "shaders_anthology.xdb0",
+}
 DB_EXCLUDED_REL_PATHS = {
     "db/mods/00_modded_exes_gamedata.db0",
 }
@@ -380,6 +383,14 @@ def live_db_files() -> dict[str, dict]:
             rel = (Path("db") / folder / path.relative_to(base)).as_posix()
             if rel.casefold() in DB_EXCLUDED_REL_PATHS:
                 continue
+            files[rel] = {
+                "path": rel,
+                "asset_name": db_asset_name(rel),
+                "size": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+    for rel, path in DB_SOURCE_FILES.items():
+        if path.exists() and rel.casefold() not in DB_EXCLUDED_REL_PATHS:
             files[rel] = {
                 "path": rel,
                 "asset_name": db_asset_name(rel),

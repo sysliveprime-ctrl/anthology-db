@@ -8,8 +8,10 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from urllib.error import HTTPError
@@ -25,6 +27,9 @@ DB_DIR = WORKGIT_DIR
 DB_SOURCE_DIRS = {
     "configs": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs"),
     "mods": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods"),
+}
+DB_SOURCE_FILES = {
+    "db/shaders_anthology.xdb0": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0"),
 }
 DB_EXCLUDED_REL_PATHS = {
     "db/mods/00_modded_exes_gamedata.db0",
@@ -162,6 +167,26 @@ def create_release(repo: str, tag: str, token: str, notes: str) -> dict:
 
 
 def upload_asset(release: dict, asset_path: Path, asset_name: str, token: str, replace: bool = True) -> dict:
+    if shutil.which("gh"):
+        repo = str(release.get("url", "")).split("/repos/", 1)[-1].split("/releases/", 1)[0]
+        tag = str(release.get("tag_name", "")).strip()
+        if repo and tag:
+            temp_dir = Path(tempfile.gettempdir()) / "anthology-release-assets"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_asset = temp_dir / asset_name
+            if asset_path.resolve() != temp_asset.resolve():
+                shutil.copy2(asset_path, temp_asset)
+            args = ["gh", "release", "upload", tag, str(temp_asset), "--repo", repo]
+            if replace:
+                args.append("--clobber")
+            run(args)
+            refreshed = release_by_tag(repo, tag, token)
+            if refreshed:
+                for asset in refreshed.get("assets", []):
+                    if asset.get("name") == asset_name:
+                        return asset
+            raise ReleaseError(f"Asset was uploaded but not found in release: {asset_name}")
+
     for asset in release.get("assets", []):
         if asset.get("name") == asset_name:
             if not replace:
@@ -448,6 +473,9 @@ def db_asset_paths() -> list[tuple[Path, str]]:
                 if rel_posix.casefold() in DB_EXCLUDED_REL_PATHS:
                     continue
                 paths.append((path, rel_posix))
+    for rel, path in DB_SOURCE_FILES.items():
+        if path.exists() and rel.casefold() not in DB_EXCLUDED_REL_PATHS:
+            paths.append((path, rel))
     return sorted(paths, key=lambda item: item[1].casefold())
 
 

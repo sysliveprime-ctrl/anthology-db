@@ -9,6 +9,9 @@ from pathlib import Path
 
 
 ALLOWED_DIRS = {"configs", "mods"}
+ROOT_FILES = {
+    "shaders_anthology.xdb0",
+}
 DEFAULT_RELEASE_BASE = "https://github.com/sysliveprime-ctrl/anthology-db/releases/download"
 EXCLUDED_REL_PATHS = {
     "db/mods/00_modded_exes_gamedata.db0",
@@ -44,6 +47,22 @@ def asset_name(rel_path: str) -> str:
 def build_manifest(repo_root: Path, version: str, base_url: str) -> dict:
     db_root = repo_root / "db"
     files = []
+    for name in sorted(ROOT_FILES):
+        path = db_root / name
+        if not path.exists() or not path.is_file() or not is_db_archive(path):
+            continue
+        rel = "db/" + name
+        if rel.casefold() in EXCLUDED_REL_PATHS:
+            continue
+        stat = path.stat()
+        files.append(
+            {
+                "path": rel,
+                "asset_name": asset_name(rel),
+                "size": stat.st_size,
+                "sha256": sha256_file(path),
+            }
+        )
     for part in sorted(ALLOWED_DIRS):
         root = db_root / part
         if not root.exists():
