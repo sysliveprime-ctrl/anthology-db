@@ -10,6 +10,9 @@ from pathlib import Path
 
 ALLOWED_DIRS = {"configs", "mods"}
 DEFAULT_RELEASE_BASE = "https://github.com/sysliveprime-ctrl/anthology-db/releases/download"
+EXCLUDED_REL_PATHS = {
+    "db/mods/00_modded_exes_gamedata.db0",
+}
 
 
 def is_db_archive(path: Path) -> bool:
@@ -49,6 +52,8 @@ def build_manifest(repo_root: Path, version: str, base_url: str) -> dict:
             if not path.is_file() or not is_db_archive(path):
                 continue
             rel = "db/" + path.relative_to(db_root).as_posix()
+            if rel.casefold() in EXCLUDED_REL_PATHS:
+                continue
             stat = path.stat()
             files.append(
                 {

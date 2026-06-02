@@ -26,6 +26,9 @@ DB_SOURCE_DIRS = {
     "configs": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs"),
     "mods": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods"),
 }
+DB_EXCLUDED_REL_PATHS = {
+    "db/mods/00_modded_exes_gamedata.db0",
+}
 
 LAUNCHER_REPO = "sysliveprime-ctrl/AnthologyLauncher"
 DB_REPO = "sysliveprime-ctrl/anthology-db"
@@ -205,6 +208,64 @@ def update_launcher_version(root: Path, version: str, notes: str) -> None:
     write_json(meta, data)
 
 
+def py_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def launcher_news_pattern(lang: str) -> re.Pattern[str]:
+    return re.compile(
+        rf'(?ms)(?P<prefix>    "{re.escape(lang)}": \{{.*?)(?P<entries>(?:        "news_\d+": "(?:\\.|[^"\\])*",\n        "news_\d+_body": "(?:\\.|[^"\\])*",\n)+)'
+    )
+
+
+def parse_launcher_news_entries(block: str) -> list[tuple[str, str]]:
+    pattern = re.compile(
+        r'        "news_(\d+)": "((?:\\.|[^"\\])*)",\n'
+        r'        "news_\1_body": "((?:\\.|[^"\\])*)",\n'
+    )
+    entries = []
+    for match in pattern.finditer(block):
+        title = json.loads(f'"{match.group(2)}"')
+        body = json.loads(f'"{match.group(3)}"')
+        entries.append((title, body))
+    return entries
+
+
+def render_launcher_news_entries(entries: list[tuple[str, str]]) -> str:
+    lines = []
+    for index, (title, body) in enumerate(entries, start=1):
+        lines.append(f'        "news_{index}": {py_string(title)},')
+        lines.append(f'        "news_{index}_body": {py_string(body)},')
+    return "\n".join(lines) + "\n"
+
+
+def update_launcher_news(
+    root: Path,
+    ru_title: str,
+    ru_body: str,
+    en_title: str | None = None,
+    en_body: str | None = None,
+    max_items: int = 7,
+) -> None:
+    script = root / "anthology_launcher.py"
+    text = script.read_text(encoding="utf-8")
+    replacements = {
+        "ru": (ru_title, ru_body),
+        "en": (en_title or ru_title, en_body or ru_body),
+    }
+
+    for lang, new_entry in replacements.items():
+        pattern = launcher_news_pattern(lang)
+        match = pattern.search(text)
+        if not match:
+            raise ReleaseError(f"Could not find launcher news block for {lang}.")
+        entries = [new_entry] + parse_launcher_news_entries(match.group("entries"))
+        entries = entries[:max_items]
+        text = text[:match.start("entries")] + render_launcher_news_entries(entries) + text[match.end("entries"):]
+
+    script.write_text(text, encoding="utf-8")
+
+
 def is_modpack_update_path(path: str) -> bool:
     candidate = Path(path.replace("\\", "/"))
     if candidate.is_absolute():
@@ -310,6 +371,26 @@ def command_launcher(args: argparse.Namespace) -> None:
     ))
 
 
+def command_launcher_news(args: argparse.Namespace) -> None:
+    root = Path(args.path or LAUNCHER_DIR)
+    version = args.version or default_version()
+    title = (args.news_title or "").strip()
+    body = (args.news_body or "").strip()
+    if not title or not body:
+        raise ReleaseError("launcher-news requires --news-title and --news-body.")
+
+    update_launcher_news(
+        root,
+        title,
+        body,
+        en_title=(args.news_title_en or "").strip() or None,
+        en_body=(args.news_body_en or "").strip() or None,
+        max_items=args.max_news,
+    )
+    args.notes = args.notes or f"Launcher news: {title}"
+    command_launcher(args)
+
+
 def command_modpack(args: argparse.Namespace) -> None:
     root = Path(args.path or MODPACK_DIR)
     version = args.version or default_version()
@@ -363,7 +444,10 @@ def db_asset_paths() -> list[tuple[Path, str]]:
         for path in base.rglob("*"):
             if path.is_file():
                 rel = Path("db") / folder / path.relative_to(base)
-                paths.append((path, rel.as_posix()))
+                rel_posix = rel.as_posix()
+                if rel_posix.casefold() in DB_EXCLUDED_REL_PATHS:
+                    continue
+                paths.append((path, rel_posix))
     return sorted(paths, key=lambda item: item[1].casefold())
 
 
@@ -436,6 +520,17 @@ def build_parser() -> argparse.ArgumentParser:
     launcher.add_argument("--skip-build", action="store_true", help="Do not run PyInstaller")
     launcher.add_argument("--skip-upload", action="store_true", help="Do not replace latest GitHub release exe")
     launcher.set_defaults(func=command_launcher)
+
+    launcher_news = sub.add_parser("launcher-news", help="Publish launcher update with a new top news item")
+    add_common(launcher_news)
+    launcher_news.add_argument("--news-title", required=True, help="Russian/top news title")
+    launcher_news.add_argument("--news-body", required=True, help="Russian/top news body")
+    launcher_news.add_argument("--news-title-en", help="English news title; Russian title is used when omitted")
+    launcher_news.add_argument("--news-body-en", help="English news body; Russian body is used when omitted")
+    launcher_news.add_argument("--max-news", type=int, default=7, help="How many news items to keep in launcher")
+    launcher_news.add_argument("--skip-build", action="store_true", help="Do not run PyInstaller")
+    launcher_news.add_argument("--skip-upload", action="store_true", help="Do not replace latest GitHub release exe")
+    launcher_news.set_defaults(func=command_launcher_news)
 
     modpack = sub.add_parser("modpack", help="Publish MO2 modpack update")
     add_common(modpack)

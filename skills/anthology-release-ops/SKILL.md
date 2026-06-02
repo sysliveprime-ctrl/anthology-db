@@ -93,6 +93,20 @@ Does:
 
 Never copy the built exe to the local game folder unless explicitly asked.
 
+Launcher top news can be published through the wizard:
+
+```powershell
+py -3 E:\dev\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_publish_wizard.py
+```
+
+Choose `Launcher news`; it inserts the entered news item at the top of the
+launcher news feed, bumps the launcher version, builds `AnomalyLauncher.exe`,
+pushes `main`, and replaces the latest Release asset. CLI equivalent:
+
+```powershell
+py -3 E:\dev\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_release_ops.py launcher-news --version YYYY.MM.DD.N --news-title "..." --news-body "..."
+```
+
 ## Modpack
 
 ```powershell
@@ -205,6 +219,14 @@ Commits and pushes `E:\dev\anomaly-codex-main\ai_workspace\Source_Anthology` to
 launcher updates.
 
 ## Safety Checklist
+
+Default collaboration rule:
+
+- The maintainer can publish routine launcher/MO2/DB/engine updates through
+  `anthology_publish_wizard.py`. Do not push or publish release assets by
+  default after routine changes; prepare the code/tooling and explain what to
+  run. Only run release publishing commands when explicitly asked to push,
+  publish, upload, or release.
 
 Before publishing:
 

@@ -1,7 +1,7 @@
 {
-  "version": "2026.06.01.4",
+  "version": "2026.06.02.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.01.4/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.02.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -56,12 +56,6 @@
       "asset_name": "db_configs_spawns.xdb0",
       "size": 46450377,
       "sha256": "b7b56efe07a7852b47d2650a1bcf9132b28206bfed8d4aec8d3c4394e060297a"
-    },
-    {
-      "path": "db/mods/00_modded_exes_gamedata.db0",
-      "asset_name": "db_mods_00_modded_exes_gamedata.db0",
-      "size": 553803,
-      "sha256": "a070fd28d44d520848a3dcb9f4eaf0868532bf2685b4289665c8e205a40791bc"
     },
     {
       "path": "db/mods/[ANT] Mod Configuration Menu.xdb0",
@@ -166,5 +160,5 @@
       "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952"
     }
   ],
-  "notes": "ИСПРАВЛЕН ВЫЛЕТ encyclopedia___anthology_developers"
+  "notes": "DB update no longer manages engine DB file."
 }
