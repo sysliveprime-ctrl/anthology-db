@@ -192,9 +192,10 @@ def print_dashboard(launcher_current: str, db_current: str, mo2_current: str, en
     print(f"  {CYAN}4{RESET}. DB + MO2         {DIM}оба контентных канала{RESET}")
     print(f"  {CYAN}5{RESET}. Всё              {DIM}DB + MO2 + MT движок{RESET}")
     print(f"  {CYAN}6{RESET}. Новости лаунчера {DIM}добавить новость сверху и выпустить лаунчер{RESET}")
-    print(f"  {CYAN}7{RESET}. Сухой прогон     {DIM}проверки без публикации и загрузки{RESET}")
-    print(f"  {CYAN}8{RESET}. Повтор MT upload {DIM}дозалить ZIP в уже созданный релиз{RESET}")
-    print(f"  {CYAN}9{RESET}. Выход\n")
+    print(f"  {CYAN}7{RESET}. Управление новостями {DIM}редактировать или удалить старые новости лаунчера{RESET}")
+    print(f"  {CYAN}8{RESET}. Сухой прогон     {DIM}проверки без публикации и загрузки{RESET}")
+    print(f"  {CYAN}9{RESET}. Повтор MT upload {DIM}дозалить ZIP в уже созданный релиз{RESET}")
+    print(f"  {CYAN}10{RESET}. Выход\n")
 
 
 def choose_target() -> tuple[str, bool]:
@@ -217,16 +218,21 @@ def choose_target() -> tuple[str, bool]:
             "launcher": ("launcher-news", False),
             "launcher-news": ("launcher-news", False),
             "news": ("launcher-news", False),
-            "7": ("all", True),
+            "7": ("launcher-news-manage", False),
+            "manage-news": ("launcher-news-manage", False),
+            "launcher-news-manage": ("launcher-news-manage", False),
+            "edit-news": ("launcher-news-manage", False),
+            "delete-news": ("launcher-news-manage", False),
+            "8": ("all", True),
             "dry": ("all", True),
             "dry-run": ("all", True),
-            "8": ("engine-upload", False),
+            "9": ("engine-upload", False),
             "engine-upload": ("engine-upload", False),
             "upload-engine": ("engine-upload", False),
             "retry-engine": ("engine-upload", False),
             "retry": ("engine-upload", False),
             "повтор": ("engine-upload", False),
-            "9": ("exit", False),
+            "10": ("exit", False),
             "exit": ("exit", False),
             "q": ("exit", False),
         }
@@ -559,6 +565,85 @@ def publish_launcher_news(
         print(f"Проверена версия лаунчера через API: {manifest.get('version')}")
 
 
+def launcher_news_list() -> list[dict]:
+    output = run([sys.executable, str(HELPER), "launcher-news-list"], cwd=WORKGIT_DIR, capture=True)
+    return json.loads(output)["news"]
+
+
+def publish_launcher_news_manage(version: str, notes: str, yes: bool, dry_run: bool) -> None:
+    news = launcher_news_list()
+    if not news:
+        raise PublishError("Список новостей лаунчера пуст.")
+
+    print("\nТекущие новости лаунчера")
+    for item in news:
+        body = str(item["body"]).replace("\n", " ")
+        if len(body) > 120:
+            body = body[:117] + "..."
+        print(f"  {item['index']}. {item['title']}")
+        print(f"     {DIM}{body}{RESET}")
+
+    action = input(f"{CYAN}Действие{RESET} [edit/delete]: ").strip().lower()
+    if action not in {"edit", "delete", "e", "d", "редактировать", "удалить"}:
+        raise PublishError("Действие должно быть edit или delete.")
+
+    raw_index = prompt_required("Номер новости")
+    try:
+        index = int(raw_index)
+    except ValueError as exc:
+        raise PublishError("Номер новости должен быть числом.") from exc
+    selected = next((item for item in news if item["index"] == index), None)
+    if not selected:
+        raise PublishError(f"Новость с номером {index} не найдена.")
+
+    print(f"\nВыбрана новость #{index}:\n  {selected['title']}\n  {selected['body']}")
+    if action in {"delete", "d", "удалить"}:
+        if not prompt_yes(f"Удалить новость #{index} и выпустить лаунчер {version}?", yes):
+            return
+        args = [
+            sys.executable,
+            str(HELPER),
+            "launcher-news-delete",
+            "--version",
+            version,
+            "--notes",
+            notes,
+            "--index",
+            str(index),
+        ]
+    else:
+        title = prompt(str(selected["title"]), "Новый заголовок")
+        print(f"{DIM}Оставьте текст пустым, чтобы сохранить старый текст.{RESET}")
+        try:
+            body = prompt_multiline("Новый текст")
+        except PublishError:
+            body = str(selected["body"])
+        if not prompt_yes(f"Изменить новость #{index} и выпустить лаунчер {version}?", yes):
+            return
+        args = [
+            sys.executable,
+            str(HELPER),
+            "launcher-news-edit",
+            "--version",
+            version,
+            "--notes",
+            notes,
+            "--index",
+            str(index),
+            "--news-title",
+            title,
+            "--news-body",
+            body,
+        ]
+
+    if dry_run:
+        args.append("--dry-run")
+    run(args, cwd=WORKGIT_DIR)
+    if not dry_run:
+        manifest = github_manifest(LAUNCHER_MANIFEST_API)
+        print(f"Проверена версия лаунчера через API: {manifest.get('version')}")
+
+
 def engine_asset_name(version: str) -> str:
     return f"STALKER-Anomaly-modded-exes-MT-TEST_{version}.zip"
 
@@ -681,7 +766,7 @@ def retry_engine_asset_upload(version: str, yes: bool, dry_run: bool) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = RussianArgumentParser(description="Интерактивный мастер публикации обновлений Anthology.")
-    parser.add_argument("--target", choices=["db", "mo2", "engine", "engine-upload", "content", "all", "launcher-news"], help="Что публиковать.")
+    parser.add_argument("--target", choices=["db", "mo2", "engine", "engine-upload", "content", "all", "launcher-news", "launcher-news-manage"], help="Что публиковать.")
     parser.add_argument("--version", help="Использовать одну версию для выбранных целей.")
     parser.add_argument("--launcher-version", help="Версия лаунчера.")
     parser.add_argument("--db-version", help="Версия DB.")
@@ -697,11 +782,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-engine-build", action="store_true", help="Упаковать текущую live-папку bin без пересборки движка.")
     parser.add_argument("--yes", action="store_true", help="Не спрашивать подтверждения.")
     parser.add_argument("--dry-run", action="store_true", help="Проверить и записать локальные файлы, но пропустить публикацию и загрузку в helper.")
+    parser.add_argument("--manage-news", action="store_true", help="Редактировать или удалить старые новости лаунчера.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.manage_news:
+        args.target = "launcher-news-manage"
     interactive = not args.target
 
     while True:
@@ -719,7 +807,7 @@ def main() -> int:
                 print("Отменено.")
                 return 0
 
-        if target not in {"db", "mo2", "engine", "engine-upload", "content", "all", "launcher-news"}:
+        if target not in {"db", "mo2", "engine", "engine-upload", "content", "all", "launcher-news", "launcher-news-manage"}:
             raise PublishError("Цель должна быть db, mo2, engine, engine-upload, content, all или launcher-news.")
 
         launcher_version = None
@@ -732,6 +820,11 @@ def main() -> int:
         engine_notes = None
         news_title = None
         news_body = None
+
+        if target == "launcher-news-manage":
+            default = args.version or args.launcher_version or next_version(launcher_current)
+            launcher_version = args.launcher_version or args.version or prompt(default, "Версия лаунчера")
+            launcher_notes = args.launcher_notes or args.notes or "Управление новостями лаунчера."
 
         if target == "launcher-news":
             default = args.version or args.launcher_version or next_version(launcher_current)
@@ -771,6 +864,9 @@ def main() -> int:
 
         if target == "launcher-news" and launcher_version and news_title and news_body and launcher_notes:
             publish_launcher_news(launcher_version, news_title, news_body, launcher_notes, args.yes, dry_run)
+
+        if target == "launcher-news-manage" and launcher_version and launcher_notes:
+            publish_launcher_news_manage(launcher_version, launcher_notes, args.yes, dry_run)
 
         if target in {"db", "content", "all"} and db_version and db_notes is not None:
             publish_db(db_version, db_notes, args.yes, dry_run)

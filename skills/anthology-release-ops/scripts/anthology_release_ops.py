@@ -229,7 +229,7 @@ def update_launcher_version(root: Path, version: str, notes: str) -> None:
     data = read_json(meta)
     data["version"] = version
     data["notes"] = notes
-    data.setdefault("exe_url", f"https://github.com/{LAUNCHER_REPO}/releases/latest/download/{LAUNCHER_ASSET}")
+    data["exe_url"] = f"https://github.com/{LAUNCHER_REPO}/releases/latest/download/{LAUNCHER_ASSET}?v={version}"
     write_json(meta, data)
 
 
@@ -288,6 +288,59 @@ def update_launcher_news(
         entries = entries[:max_items]
         text = text[:match.start("entries")] + render_launcher_news_entries(entries) + text[match.end("entries"):]
 
+    script.write_text(text, encoding="utf-8")
+
+
+def launcher_news_entries(root: Path, lang: str = "ru") -> list[tuple[str, str]]:
+    script = root / "anthology_launcher.py"
+    text = script.read_text(encoding="utf-8")
+    pattern = launcher_news_pattern(lang)
+    match = pattern.search(text)
+    if not match:
+        raise ReleaseError(f"Could not find launcher news block for {lang}.")
+    return parse_launcher_news_entries(match.group("entries"))
+
+
+def edit_launcher_news(
+    root: Path,
+    index: int,
+    ru_title: str,
+    ru_body: str,
+    en_title: str | None = None,
+    en_body: str | None = None,
+) -> None:
+    script = root / "anthology_launcher.py"
+    text = script.read_text(encoding="utf-8")
+    replacements = {
+        "ru": (ru_title, ru_body),
+        "en": (en_title or ru_title, en_body or ru_body),
+    }
+    for lang, entry in replacements.items():
+        pattern = launcher_news_pattern(lang)
+        match = pattern.search(text)
+        if not match:
+            raise ReleaseError(f"Could not find launcher news block for {lang}.")
+        entries = parse_launcher_news_entries(match.group("entries"))
+        if index < 1 or index > len(entries):
+            raise ReleaseError(f"News index {index} is out of range for {lang}; found {len(entries)} items.")
+        entries[index - 1] = entry
+        text = text[:match.start("entries")] + render_launcher_news_entries(entries) + text[match.end("entries"):]
+    script.write_text(text, encoding="utf-8")
+
+
+def delete_launcher_news(root: Path, index: int) -> None:
+    script = root / "anthology_launcher.py"
+    text = script.read_text(encoding="utf-8")
+    for lang in ("ru", "en"):
+        pattern = launcher_news_pattern(lang)
+        match = pattern.search(text)
+        if not match:
+            raise ReleaseError(f"Could not find launcher news block for {lang}.")
+        entries = parse_launcher_news_entries(match.group("entries"))
+        if index < 1 or index > len(entries):
+            raise ReleaseError(f"News index {index} is out of range for {lang}; found {len(entries)} items.")
+        del entries[index - 1]
+        text = text[:match.start("entries")] + render_launcher_news_entries(entries) + text[match.end("entries"):]
     script.write_text(text, encoding="utf-8")
 
 
@@ -413,6 +466,50 @@ def command_launcher_news(args: argparse.Namespace) -> None:
         max_items=args.max_news,
     )
     args.notes = args.notes or f"Launcher news: {title}"
+    command_launcher(args)
+
+
+def command_launcher_news_list(args: argparse.Namespace) -> None:
+    root = Path(args.path or LAUNCHER_DIR)
+    lang = args.lang or "ru"
+    entries = launcher_news_entries(root, lang)
+    print(json.dumps(
+        {
+            "type": "launcher-news-list",
+            "lang": lang,
+            "count": len(entries),
+            "news": [
+                {"index": index, "title": title, "body": body}
+                for index, (title, body) in enumerate(entries, start=1)
+            ],
+        },
+        ensure_ascii=False,
+        indent=2,
+    ))
+
+
+def command_launcher_news_edit(args: argparse.Namespace) -> None:
+    root = Path(args.path or LAUNCHER_DIR)
+    title = (args.news_title or "").strip()
+    body = (args.news_body or "").strip()
+    if not title or not body:
+        raise ReleaseError("launcher-news-edit requires --news-title and --news-body.")
+    edit_launcher_news(
+        root,
+        args.index,
+        title,
+        body,
+        en_title=(args.news_title_en or "").strip() or None,
+        en_body=(args.news_body_en or "").strip() or None,
+    )
+    args.notes = args.notes or f"Edit launcher news #{args.index}: {title}"
+    command_launcher(args)
+
+
+def command_launcher_news_delete(args: argparse.Namespace) -> None:
+    root = Path(args.path or LAUNCHER_DIR)
+    delete_launcher_news(root, args.index)
+    args.notes = args.notes or f"Delete launcher news #{args.index}"
     command_launcher(args)
 
 
@@ -559,6 +656,29 @@ def build_parser() -> argparse.ArgumentParser:
     launcher_news.add_argument("--skip-build", action="store_true", help="Do not run PyInstaller")
     launcher_news.add_argument("--skip-upload", action="store_true", help="Do not replace latest GitHub release exe")
     launcher_news.set_defaults(func=command_launcher_news)
+
+    launcher_news_list = sub.add_parser("launcher-news-list", help="List current launcher news items")
+    launcher_news_list.add_argument("--path", help="Override project/repo path")
+    launcher_news_list.add_argument("--lang", choices=["ru", "en"], default="ru", help="Language block to list")
+    launcher_news_list.set_defaults(func=command_launcher_news_list)
+
+    launcher_news_edit = sub.add_parser("launcher-news-edit", help="Edit an existing launcher news item and publish launcher")
+    add_common(launcher_news_edit)
+    launcher_news_edit.add_argument("--index", type=int, required=True, help="1-based news index to edit")
+    launcher_news_edit.add_argument("--news-title", required=True, help="Russian news title")
+    launcher_news_edit.add_argument("--news-body", required=True, help="Russian news body")
+    launcher_news_edit.add_argument("--news-title-en", help="English news title; Russian title is used when omitted")
+    launcher_news_edit.add_argument("--news-body-en", help="English news body; Russian body is used when omitted")
+    launcher_news_edit.add_argument("--skip-build", action="store_true", help="Do not run PyInstaller")
+    launcher_news_edit.add_argument("--skip-upload", action="store_true", help="Do not replace latest GitHub release exe")
+    launcher_news_edit.set_defaults(func=command_launcher_news_edit)
+
+    launcher_news_delete = sub.add_parser("launcher-news-delete", help="Delete an existing launcher news item and publish launcher")
+    add_common(launcher_news_delete)
+    launcher_news_delete.add_argument("--index", type=int, required=True, help="1-based news index to delete")
+    launcher_news_delete.add_argument("--skip-build", action="store_true", help="Do not run PyInstaller")
+    launcher_news_delete.add_argument("--skip-upload", action="store_true", help="Do not replace latest GitHub release exe")
+    launcher_news_delete.set_defaults(func=command_launcher_news_delete)
 
     modpack = sub.add_parser("modpack", help="Publish MO2 modpack update")
     add_common(modpack)
