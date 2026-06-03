@@ -68,7 +68,7 @@ class ReleaseControl(tk.Tk):
         self._build_style()
         self._build_ui()
         self.after(100, self._drain_queue)
-        self.refresh_versions()
+        self.refresh_versions(refresh_news=True)
 
     def _build_style(self) -> None:
         self.configure(bg="#111416")
@@ -198,7 +198,7 @@ class ReleaseControl(tk.Tk):
         ttk.Button(row, text="Все git-статусы", command=self.all_git_statuses).pack(side="left", padx=(0, 8))
         ttk.Button(row, text="Проверить публичный launcher", command=self.check_launcher_public).pack(side="left")
 
-    def refresh_versions(self) -> None:
+    def refresh_versions(self, refresh_news: bool = False) -> None:
         def work() -> None:
             for key, path, label in (
                 ("launcher", LAUNCHER_DIR / "launcher_version.json", "Лаунчер"),
@@ -211,12 +211,35 @@ class ReleaseControl(tk.Tk):
                     self.queue.put(("version", f"{key}|{label}: {data.get('version', '?')}"))
                 except Exception as exc:
                     self.queue.put(("version", f"{key}|{label}: ошибка ({exc})"))
-            self.queue.put(("call", "refresh_news"))
+            if refresh_news:
+                self.queue.put(("call", "refresh_news_silent"))
 
         threading.Thread(target=work, daemon=True).start()
 
     def refresh_news(self) -> None:
         self.run_command([sys.executable, str(HELPER), "launcher-news-list"], WORKGIT_DIR, on_success=self._load_news_json, title="Список новостей")
+
+    def refresh_news_silent(self) -> None:
+        if self.running:
+            return
+
+        def work() -> None:
+            try:
+                result = subprocess.run(
+                    [sys.executable, str(HELPER), "launcher-news-list"],
+                    cwd=str(WORKGIT_DIR),
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
+                if result.returncode == 0:
+                    self.queue.put(("news_json", result.stdout or ""))
+                else:
+                    self.queue.put(("log", (result.stdout or "").rstrip()))
+            except Exception as exc:
+                self.queue.put(("log", f"Не удалось тихо обновить новости: {exc}"))
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _load_news_json(self, output: str) -> None:
         try:
@@ -447,8 +470,10 @@ class ReleaseControl(tk.Tk):
             elif kind == "callback_arg" and callback:
                 callback(value)
                 callback = None
-            elif kind == "call" and value == "refresh_news":
-                self.refresh_news()
+            elif kind == "news_json":
+                self._load_news_json(value)
+            elif kind == "call" and value == "refresh_news_silent":
+                self.refresh_news_silent()
         self.after(100, self._drain_queue)
 
     def _log(self, text: str) -> None:
