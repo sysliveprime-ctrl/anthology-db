@@ -377,6 +377,8 @@ class ReleaseControl(tk.Tk):
         self.news_en_title = tk.StringVar()
         self.news_status = tk.StringVar(value="Черновик: без изменений")
         self.news_selected_label = tk.StringVar(value="Выбери новость слева или создай новую.")
+        self.news_ru_title.trace_add("write", lambda *_args: self.update_news_list_title_from_form())
+        self.news_en_title.trace_add("write", lambda *_args: self.update_news_list_title_from_form())
         ttk.Label(form, textvariable=self.news_status, style="Muted.TLabel").pack(anchor="w", pady=(0, 6))
         ttk.Label(form, textvariable=self.news_selected_label, style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
         self._form_entry(form, "RU заголовок", self.news_ru_title)
@@ -810,14 +812,43 @@ class ReleaseControl(tk.Tk):
         body_en = self.text_value(self.news_en_body) or body
         return title, body, title_en, body_en
 
+    def update_news_list_title_from_form(self) -> None:
+        if self.loading_news_form or self.news_selected_index is None:
+            return
+        index = self.news_selected_index
+        item = next((entry for entry in self.news_items if int(entry["index"]) == index), None)
+        if not item or not self.news_tree.exists(str(index)):
+            return
+        ru_title = self.news_ru_title.get().strip()
+        en_title = self.news_en_title.get().strip() or ru_title
+        changed = item.get("title", "") != ru_title
+        item["title"] = ru_title
+        en_item = self.english_news_for(index)
+        if en_item:
+            changed = changed or en_item.get("title", "") != en_title
+            en_item["title"] = en_title
+        else:
+            self.news_items_en.append({"index": index, "title": en_title, "body": self.text_value(self.news_en_body)})
+            changed = True
+        visible_ru = ru_title or "(новая новость)"
+        visible_en = en_title or "draft"
+        self.news_tree.item(str(index), values=(index, f"{visible_ru} / {visible_en}"))
+        if changed:
+            self.news_dirty = True
+            self.update_news_status()
+
     def clear_news_form(self, label: str) -> None:
         self.news_tree.selection_remove(self.news_tree.selection())
         self.news_selected_index = None
         self.news_selected_label.set(label)
-        self.news_ru_title.set("")
-        self.news_en_title.set("")
-        self.set_text_value(self.news_ru_body, "")
-        self.set_text_value(self.news_en_body, "")
+        self.loading_news_form = True
+        try:
+            self.news_ru_title.set("")
+            self.news_en_title.set("")
+            self.set_text_value(self.news_ru_body, "")
+            self.set_text_value(self.news_en_body, "")
+        finally:
+            self.loading_news_form = False
         self.update_news_status()
 
     def new_news_draft(self) -> None:
@@ -939,10 +970,14 @@ class ReleaseControl(tk.Tk):
         en_item = self.english_news_for(index)
         self.news_selected_index = index
         self.news_selected_label.set(f"Выбрана: новость #{index}")
-        self.news_ru_title.set(str(item.get("title", "")))
-        self.set_text_value(self.news_ru_body, str(item.get("body", "")))
-        self.news_en_title.set(str(en_item.get("title", "")))
-        self.set_text_value(self.news_en_body, str(en_item.get("body", "")))
+        self.loading_news_form = True
+        try:
+            self.news_ru_title.set(str(item.get("title", "")))
+            self.set_text_value(self.news_ru_body, str(item.get("body", "")))
+            self.news_en_title.set(str(en_item.get("title", "")))
+            self.set_text_value(self.news_en_body, str(en_item.get("body", "")))
+        finally:
+            self.loading_news_form = False
 
     def save_news_form_to_index(self, index: int | None, validate: bool = True) -> bool:
         if index is None:
