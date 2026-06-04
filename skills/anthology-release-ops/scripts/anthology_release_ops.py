@@ -344,6 +344,24 @@ def delete_launcher_news(root: Path, index: int) -> None:
     script.write_text(text, encoding="utf-8")
 
 
+def replace_launcher_news(root: Path, ru_entries: list[tuple[str, str]], en_entries: list[tuple[str, str]]) -> None:
+    if not ru_entries:
+        raise ReleaseError("At least one launcher news item is required.")
+    if len(ru_entries) != len(en_entries):
+        raise ReleaseError(f"RU/EN news count mismatch: {len(ru_entries)} != {len(en_entries)}.")
+
+    script = root / "anthology_launcher.py"
+    text = script.read_text(encoding="utf-8")
+    replacements = {"ru": ru_entries, "en": en_entries}
+    for lang, entries in replacements.items():
+        pattern = launcher_news_pattern(lang)
+        match = pattern.search(text)
+        if not match:
+            raise ReleaseError(f"Could not find launcher news block for {lang}.")
+        text = text[:match.start("entries")] + render_launcher_news_entries(entries) + text[match.end("entries"):]
+    script.write_text(text, encoding="utf-8")
+
+
 def is_modpack_update_path(path: str) -> bool:
     candidate = Path(path.replace("\\", "/"))
     if candidate.is_absolute():
@@ -513,6 +531,41 @@ def command_launcher_news_delete(args: argparse.Namespace) -> None:
     command_launcher(args)
 
 
+def command_launcher_news_apply(args: argparse.Namespace) -> None:
+    root = Path(args.path or LAUNCHER_DIR)
+    if args.news_json:
+        payload = json.loads(args.news_json)
+    elif args.news_file:
+        payload = json.loads(Path(args.news_file).read_text(encoding="utf-8-sig"))
+    else:
+        raise ReleaseError("launcher-news-apply requires --news-json or --news-file.")
+
+    items = payload.get("news") if isinstance(payload, dict) else payload
+    if not isinstance(items, list):
+        raise ReleaseError("launcher-news-apply payload must contain a news list.")
+
+    ru_entries: list[tuple[str, str]] = []
+    en_entries: list[tuple[str, str]] = []
+    for pos, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            raise ReleaseError(f"News item #{pos} must be an object.")
+        ru_title = str(item.get("title") or item.get("ru_title") or "").strip()
+        ru_body = str(item.get("body") or item.get("ru_body") or "").strip()
+        en_title = str(item.get("title_en") or item.get("en_title") or ru_title).strip()
+        en_body = str(item.get("body_en") or item.get("en_body") or ru_body).strip()
+        if not ru_title or not ru_body:
+            raise ReleaseError(f"News item #{pos} requires RU title and RU body.")
+        ru_entries.append((ru_title, ru_body))
+        en_entries.append((en_title or ru_title, en_body or ru_body))
+
+    if args.max_news:
+        ru_entries = ru_entries[:args.max_news]
+        en_entries = en_entries[:args.max_news]
+    replace_launcher_news(root, ru_entries, en_entries)
+    args.notes = args.notes or f"Apply launcher news list ({len(ru_entries)} items)"
+    command_launcher(args)
+
+
 def command_modpack(args: argparse.Namespace) -> None:
     root = Path(args.path or MODPACK_DIR)
     version = args.version or default_version()
@@ -679,6 +732,15 @@ def build_parser() -> argparse.ArgumentParser:
     launcher_news_delete.add_argument("--skip-build", action="store_true", help="Do not run PyInstaller")
     launcher_news_delete.add_argument("--skip-upload", action="store_true", help="Do not replace latest GitHub release exe")
     launcher_news_delete.set_defaults(func=command_launcher_news_delete)
+
+    launcher_news_apply = sub.add_parser("launcher-news-apply", help="Replace launcher news list and publish launcher once")
+    add_common(launcher_news_apply)
+    launcher_news_apply.add_argument("--news-json", help="JSON payload with a news list")
+    launcher_news_apply.add_argument("--news-file", help="Path to JSON payload with a news list")
+    launcher_news_apply.add_argument("--max-news", type=int, default=7, help="How many news items to keep in launcher")
+    launcher_news_apply.add_argument("--skip-build", action="store_true", help="Do not run PyInstaller")
+    launcher_news_apply.add_argument("--skip-upload", action="store_true", help="Do not replace latest GitHub release exe")
+    launcher_news_apply.set_defaults(func=command_launcher_news_apply)
 
     modpack = sub.add_parser("modpack", help="Publish MO2 modpack update")
     add_common(modpack)

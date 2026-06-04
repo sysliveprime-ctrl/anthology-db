@@ -7,6 +7,7 @@ import json
 import queue
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import tkinter as tk
@@ -147,6 +148,7 @@ class ReleaseControl(tk.Tk):
         self.running = False
         self.news_items: list[dict] = []
         self.news_items_en: list[dict] = []
+        self.news_dirty = False
 
         self._build_style()
         self._build_ui()
@@ -274,9 +276,10 @@ class ReleaseControl(tk.Tk):
         top.pack(fill="x", pady=(0, 10))
         ttk.Button(top, text="Обновить список", command=self.refresh_news).pack(side="left", padx=(0, 8))
         ttk.Button(top, text="Новая новость", command=self.new_news_draft).pack(side="left", padx=(0, 8))
-        ttk.Button(top, text="Выпустить как новую", command=self.add_news, style="Accent.TButton").pack(side="left", padx=(0, 8))
-        ttk.Button(top, text="Сохранить выбранную", command=self.edit_news, style="Accent.TButton").pack(side="left", padx=(0, 8))
+        ttk.Button(top, text="Добавить сверху", command=self.add_news).pack(side="left", padx=(0, 8))
+        ttk.Button(top, text="Сохранить выбранную", command=self.edit_news).pack(side="left", padx=(0, 8))
         ttk.Button(top, text="Удалить выбранную", command=self.delete_news, style="Danger.TButton").pack(side="left")
+        ttk.Button(top, text="Опубликовать изменения", command=self.publish_news_changes, style="Accent.TButton").pack(side="right")
 
         editor = ttk.PanedWindow(news, orient="horizontal")
         editor.pack(fill="both", expand=True)
@@ -297,7 +300,9 @@ class ReleaseControl(tk.Tk):
 
         self.news_ru_title = tk.StringVar()
         self.news_en_title = tk.StringVar()
+        self.news_status = tk.StringVar(value="Черновик без изменений")
         self.news_selected_label = tk.StringVar(value="Выбрана: новая новость")
+        ttk.Label(form, textvariable=self.news_status, style="Muted.TLabel").pack(anchor="w", pady=(0, 6))
         ttk.Label(form, textvariable=self.news_selected_label, style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
         self._form_entry(form, "RU заголовок", self.news_ru_title)
         self.news_ru_body = self._form_text(form, "RU текст", height=6)
@@ -379,6 +384,8 @@ class ReleaseControl(tk.Tk):
         threading.Thread(target=work, daemon=True).start()
 
     def refresh_news(self) -> None:
+        if self.news_dirty and not messagebox.askyesno("Новости", "В черновике есть неопубликованные изменения.\n\nСбросить их и заново загрузить новости из лаунчера?"):
+            return
         self.run_command(
             [sys.executable, str(HELPER), "launcher-news-list"],
             WORKGIT_DIR,
@@ -433,9 +440,13 @@ class ReleaseControl(tk.Tk):
                 en_payload = json.loads(en_output)
             self.news_items = ru_payload.get("news", [])
             self.news_items_en = en_payload.get("news", [])
+            self.news_dirty = False
         except Exception as exc:
             messagebox.showerror("Новости", f"Не удалось прочитать список новостей:\n{exc}")
             return
+        self.render_news_tree(select_index=1 if self.news_items else None)
+
+    def render_news_tree(self, select_index: int | None = None) -> None:
         self.news_tree.delete(*self.news_tree.get_children())
         en_by_index = {int(item["index"]): item for item in self.news_items_en}
         for item in self.news_items:
@@ -446,9 +457,32 @@ class ReleaseControl(tk.Tk):
                 iid=str(item["index"]),
                 values=(item["index"], f"{item.get('title', '')} / {en_item.get('title', '')}"),
             )
-        if self.news_items and not self.news_tree.selection():
+        if select_index is not None and self.news_tree.exists(str(select_index)):
+            self.news_tree.selection_set(str(select_index))
+            self.news_tree.see(str(select_index))
+            self.load_selected_news_into_form()
+        elif self.news_items and not self.news_tree.selection():
             self.news_tree.selection_set(str(self.news_items[0]["index"]))
             self.load_selected_news_into_form()
+        elif not self.news_items:
+            self.new_news_draft()
+        self.update_news_status()
+
+    def update_news_status(self) -> None:
+        state = "есть неопубликованные изменения" if self.news_dirty else "без неопубликованных изменений"
+        self.news_status.set(f"Черновик: {len(self.news_items)} новостей, {state}")
+
+    def reindex_news_items(self) -> None:
+        en_by_index = {int(item["index"]): item for item in self.news_items_en}
+        new_ru: list[dict] = []
+        new_en: list[dict] = []
+        for new_index, item in enumerate(self.news_items, start=1):
+            old_index = int(item["index"])
+            en_item = en_by_index.get(old_index, {})
+            new_ru.append({"index": new_index, "title": item.get("title", ""), "body": item.get("body", "")})
+            new_en.append({"index": new_index, "title": en_item.get("title", item.get("title", "")), "body": en_item.get("body", item.get("body", ""))})
+        self.news_items = new_ru
+        self.news_items_en = new_en
 
     def run_git_status(self, root: Path) -> None:
         self.run_command(["git", "status", "--short", "--branch"], root, title=f"git status: {root}")
@@ -512,38 +546,15 @@ class ReleaseControl(tk.Tk):
         )
 
     def add_news(self) -> None:
-        version = self.ask_version("лаунчера")
-        if not version:
-            return
         title, body, title_en, body_en = self.news_form_values()
         if not title or not body:
             messagebox.showwarning("Новости", "Заполни хотя бы RU заголовок и RU текст.")
             return
-        notes = f"Новость лаунчера: {title}"
-        if not self.confirm_publish("новость лаунчера", version, LAUNCHER_DIR):
-            return
-        self.run_command(
-            [
-                sys.executable,
-                str(HELPER),
-                "launcher-news",
-                "--version",
-                version,
-                "--notes",
-                notes,
-                "--news-title",
-                title,
-                "--news-body",
-                body,
-                "--news-title-en",
-                title_en.strip() or title,
-                "--news-body-en",
-                body_en.strip() or body,
-            ],
-            WORKGIT_DIR,
-            on_success=lambda _out: self.refresh_news(),
-            title=f"Add launcher news {version}",
-        )
+        self.news_items.insert(0, {"index": 0, "title": title, "body": body})
+        self.news_items_en.insert(0, {"index": 0, "title": title_en, "body": body_en})
+        self.reindex_news_items()
+        self.news_dirty = True
+        self.render_news_tree(select_index=1)
 
     def selected_news(self, warn: bool = True) -> dict | None:
         selection = self.news_tree.selection()
@@ -578,6 +589,7 @@ class ReleaseControl(tk.Tk):
         self.news_en_title.set("")
         self.set_text_value(self.news_ru_body, "")
         self.set_text_value(self.news_en_body, "")
+        self.update_news_status()
 
     def load_selected_news_into_form(self) -> None:
         item = self.selected_news(warn=False)
@@ -595,59 +607,98 @@ class ReleaseControl(tk.Tk):
         item = self.selected_news()
         if not item:
             return
-        version = self.ask_version("лаунчера")
-        if not version:
-            return
         title, body, title_en, body_en = self.news_form_values()
         if not title or not body:
             messagebox.showwarning("Новости", "Заполни хотя бы RU заголовок и RU текст.")
             return
-        index = str(item["index"])
-        if not self.confirm_publish(f"редактирование новости #{index}", version, LAUNCHER_DIR):
-            return
-        self.run_command(
-            [
-                sys.executable,
-                str(HELPER),
-                "launcher-news-edit",
-                "--version",
-                version,
-                "--notes",
-                f"Редактирование новости #{index}",
-                "--index",
-                index,
-                "--news-title",
-                title,
-                "--news-body",
-                body,
-                "--news-title-en",
-                title_en.strip() or title,
-                "--news-body-en",
-                body_en.strip() or body,
-            ],
-            WORKGIT_DIR,
-            on_success=lambda _out: self.refresh_news(),
-            title=f"Edit launcher news #{index}",
-        )
+        index = int(item["index"])
+        item["title"] = title
+        item["body"] = body
+        en_item = self.english_news_for(index)
+        if en_item:
+            en_item["title"] = title_en
+            en_item["body"] = body_en
+        else:
+            self.news_items_en.append({"index": index, "title": title_en, "body": body_en})
+        self.news_dirty = True
+        self.render_news_tree(select_index=index)
 
     def delete_news(self) -> None:
         item = self.selected_news()
         if not item:
             return
+        index = int(item["index"])
+        if not messagebox.askyesno("Удалить новость", f"Удалить новость #{index}?\n\n{item['title']}"):
+            return
+        self.news_items = [entry for entry in self.news_items if int(entry["index"]) != index]
+        self.news_items_en = [entry for entry in self.news_items_en if int(entry["index"]) != index]
+        self.reindex_news_items()
+        self.news_dirty = True
+        next_index = min(index, len(self.news_items)) if self.news_items else None
+        self.render_news_tree(select_index=next_index)
+
+    def news_payload(self) -> str:
+        en_by_index = {int(item["index"]): item for item in self.news_items_en}
+        news = []
+        for item in self.news_items:
+            index = int(item["index"])
+            en_item = en_by_index.get(index, {})
+            title = str(item.get("title", "")).strip()
+            body = str(item.get("body", "")).strip()
+            title_en = str(en_item.get("title", title)).strip() or title
+            body_en = str(en_item.get("body", body)).strip() or body
+            news.append({"title": title, "body": body, "title_en": title_en, "body_en": body_en})
+        return json.dumps({"news": news}, ensure_ascii=False)
+
+    def write_news_payload_file(self) -> Path:
+        handle = tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8", suffix=".json", prefix="anthology_launcher_news_")
+        with handle:
+            handle.write(self.news_payload())
+        return Path(handle.name)
+
+    def publish_news_changes(self) -> None:
+        if not self.news_items:
+            messagebox.showwarning("Новости", "Список новостей пустой. Оставь хотя бы одну новость.")
+            return
+        for index, item in enumerate(self.news_items, start=1):
+            if not str(item.get("title", "")).strip() or not str(item.get("body", "")).strip():
+                messagebox.showwarning("Новости", f"Новость #{index} без RU заголовка или RU текста.")
+                return
         version = self.ask_version("лаунчера")
         if not version:
             return
-        index = str(item["index"])
-        if not messagebox.askyesno("Удалить новость", f"Удалить новость #{index}?\n\n{item['title']}"):
+        notes = self.ask_notes("Заметки лаунчера", "Обновление новостей лаунчера.")
+        if notes is None:
             return
-        if not self.confirm_publish(f"удаление новости #{index}", version, LAUNCHER_DIR):
+        if not self.confirm_publish(f"список новостей лаунчера ({len(self.news_items)} шт.)", version, LAUNCHER_DIR):
             return
+        payload_file = self.write_news_payload_file()
         self.run_command(
-            [sys.executable, str(HELPER), "launcher-news-delete", "--version", version, "--notes", f"Удаление новости #{index}", "--index", index],
+            [
+                sys.executable,
+                str(HELPER),
+                "launcher-news-apply",
+                "--version",
+                version,
+                "--notes",
+                notes,
+                "--news-file",
+                str(payload_file),
+            ],
             WORKGIT_DIR,
-            on_success=lambda _out: self.refresh_news(),
-            title=f"Delete launcher news #{index}",
+            on_success=lambda _out, path=payload_file: self.publish_news_done(path),
+            title=f"Publish launcher news list {version}",
         )
+
+    def publish_news_done(self, payload_file: Path | None = None) -> None:
+        if payload_file:
+            try:
+                payload_file.unlink(missing_ok=True)
+            except OSError:
+                pass
+        self.news_dirty = False
+        self.update_news_status()
+        self.refresh_news_silent()
 
     def check_launcher_public(self) -> None:
         script = (
