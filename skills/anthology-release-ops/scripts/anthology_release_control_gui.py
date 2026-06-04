@@ -20,18 +20,52 @@ LAUNCHER_DIR = WORKGIT_DIR / "projects" / "AnthologyLauncher"
 MODPACK_DIR = Path(r"D:\Games\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods")
 ENGINE_DIR = Path(r"E:\dev\xray-monolith")
 
+COLORS = {
+    "bg": "#0f1417",
+    "panel": "#151b1f",
+    "panel_2": "#101518",
+    "border": "#2c3a40",
+    "text": "#e9f0f2",
+    "muted": "#9eabb1",
+    "accent": "#3fd0c2",
+    "accent_2": "#2f91ff",
+    "primary": "#1f8f77",
+    "primary_hover": "#28a88e",
+    "button": "#223039",
+    "button_hover": "#2b3d49",
+    "danger": "#a94442",
+    "danger_hover": "#c45755",
+    "disabled": "#657178",
+    "log_bg": "#070a0c",
+    "log_text": "#d7f7ee",
+}
+
 
 class MultilineDialog(tk.Toplevel):
     def __init__(self, parent: tk.Tk, title: str, label: str, initial: str = "") -> None:
         super().__init__(parent)
         self.title(title)
         self.resizable(True, True)
+        self.configure(bg=COLORS["bg"])
         self.result: str | None = None
         self.transient(parent)
         self.grab_set()
 
         ttk.Label(self, text=label).pack(anchor="w", padx=12, pady=(12, 6))
-        self.text = scrolledtext.ScrolledText(self, width=72, height=12, wrap="word")
+        self.text = scrolledtext.ScrolledText(
+            self,
+            width=72,
+            height=12,
+            wrap="word",
+            bg=COLORS["log_bg"],
+            fg=COLORS["log_text"],
+            insertbackground=COLORS["log_text"],
+            selectbackground="#245d55",
+            selectforeground="#ffffff",
+            relief="flat",
+            borderwidth=0,
+            font=("Segoe UI", 10),
+        )
         self.text.pack(fill="both", expand=True, padx=12, pady=6)
         self.text.insert("1.0", initial)
         self._bind_text_shortcuts()
@@ -119,29 +153,45 @@ class ReleaseControl(tk.Tk):
         self.refresh_versions(refresh_news=True)
 
     def _build_style(self) -> None:
-        self.configure(bg="#111416")
+        self.configure(bg=COLORS["bg"])
         style = ttk.Style(self)
         try:
             style.theme_use("clam")
         except tk.TclError:
             pass
-        style.configure(".", font=("Segoe UI", 10))
-        style.configure("TFrame", background="#111416")
-        style.configure("TLabel", background="#111416", foreground="#e8ecef")
-        style.configure("Muted.TLabel", foreground="#9ba3aa")
-        style.configure("Title.TLabel", font=("Segoe UI Semibold", 16), foreground="#42d6c5")
-        style.configure("Danger.TButton", foreground="#ffdddd")
-        style.configure("Accent.TButton", foreground="#eafffb")
-        style.configure("TLabelframe", background="#111416", foreground="#dce4e8")
-        style.configure("TLabelframe.Label", background="#111416", foreground="#dce4e8")
+        style.configure(".", font=("Segoe UI", 10), background=COLORS["bg"], foreground=COLORS["text"])
+        style.configure("TFrame", background=COLORS["bg"])
+        style.configure("Card.TFrame", background=COLORS["panel"])
+        style.configure("TLabel", background=COLORS["bg"], foreground=COLORS["text"])
+        style.configure("Card.TLabel", background=COLORS["panel"], foreground=COLORS["text"])
+        style.configure("Muted.TLabel", background=COLORS["bg"], foreground=COLORS["muted"])
+        style.configure("CardMuted.TLabel", background=COLORS["panel"], foreground=COLORS["muted"])
+        style.configure("Title.TLabel", font=("Segoe UI Semibold", 17), background=COLORS["bg"], foreground=COLORS["accent"])
+        style.configure("Version.TLabel", font=("Segoe UI Semibold", 10), background=COLORS["panel_2"], foreground=COLORS["text"], padding=(10, 5))
+
+        style.configure("TButton", font=("Segoe UI Semibold", 9), padding=(12, 7), borderwidth=0, relief="flat", background=COLORS["button"], foreground=COLORS["text"])
+        style.map("TButton", background=[("active", COLORS["button_hover"]), ("disabled", "#1a2228")], foreground=[("disabled", COLORS["disabled"])])
+        style.configure("Accent.TButton", background=COLORS["primary"], foreground="#f4fffc")
+        style.map("Accent.TButton", background=[("active", COLORS["primary_hover"]), ("disabled", "#1a2b29")], foreground=[("disabled", COLORS["disabled"])])
+        style.configure("Danger.TButton", background=COLORS["danger"], foreground="#fff1f1")
+        style.map("Danger.TButton", background=[("active", COLORS["danger_hover"]), ("disabled", "#2a2020")], foreground=[("disabled", COLORS["disabled"])])
+
+        style.configure("TNotebook", background=COLORS["bg"], borderwidth=0)
+        style.configure("TNotebook.Tab", font=("Segoe UI Semibold", 10), padding=(16, 8), background="#1b242a", foreground=COLORS["muted"], borderwidth=0)
+        style.map("TNotebook.Tab", background=[("selected", COLORS["panel"]), ("active", "#24313a")], foreground=[("selected", COLORS["accent"]), ("active", COLORS["text"])])
+        style.configure("TLabelframe", background=COLORS["panel"], bordercolor=COLORS["border"], lightcolor=COLORS["border"], darkcolor=COLORS["border"])
+        style.configure("TLabelframe.Label", font=("Segoe UI Semibold", 11), background=COLORS["bg"], foreground=COLORS["accent"])
+        style.configure("Treeview", background=COLORS["panel_2"], fieldbackground=COLORS["panel_2"], foreground=COLORS["text"], rowheight=28, borderwidth=0)
+        style.configure("Treeview.Heading", font=("Segoe UI Semibold", 10), background="#223039", foreground=COLORS["text"], padding=(8, 7))
+        style.map("Treeview", background=[("selected", "#23584f")], foreground=[("selected", "#ffffff")])
 
     def _build_ui(self) -> None:
-        header = ttk.Frame(self, padding=(14, 12, 14, 8))
+        header = ttk.Frame(self, padding=(18, 14, 18, 8))
         header.pack(fill="x")
         ttk.Label(header, text="ANTHOLOGY: центр выпуска обновлений", style="Title.TLabel").pack(side="left")
         ttk.Button(header, text="Обновить статусы", command=self.refresh_versions).pack(side="right")
 
-        version_box = ttk.Frame(self, padding=(14, 0, 14, 8))
+        version_box = ttk.Frame(self, padding=(18, 0, 18, 12))
         version_box.pack(fill="x")
         self.version_vars = {
             "launcher": tk.StringVar(value="Лаунчер: ..."),
@@ -150,10 +200,10 @@ class ReleaseControl(tk.Tk):
             "engine": tk.StringVar(value="MT: ..."),
         }
         for var in self.version_vars.values():
-            ttk.Label(version_box, textvariable=var, style="Muted.TLabel").pack(side="left", padx=(0, 24))
+            ttk.Label(version_box, textvariable=var, style="Version.TLabel").pack(side="left", padx=(0, 10))
 
         paned = ttk.PanedWindow(self, orient="vertical")
-        paned.pack(fill="both", expand=True, padx=14, pady=(0, 14))
+        paned.pack(fill="both", expand=True, padx=18, pady=(0, 16))
 
         main = ttk.Frame(paned)
         paned.add(main, weight=3)
@@ -168,47 +218,59 @@ class ReleaseControl(tk.Tk):
         self._build_engine_tab()
         self._build_status_tab()
 
-        self.log = scrolledtext.ScrolledText(log_frame, height=12, wrap="word", bg="#080a0b", fg="#d9f5ef", insertbackground="#d9f5ef")
-        self.log.pack(fill="both", expand=True, padx=8, pady=8)
+        self.log = scrolledtext.ScrolledText(
+            log_frame,
+            height=12,
+            wrap="word",
+            bg=COLORS["log_bg"],
+            fg=COLORS["log_text"],
+            insertbackground=COLORS["log_text"],
+            selectbackground="#245d55",
+            selectforeground="#ffffff",
+            relief="flat",
+            borderwidth=0,
+            font=("Consolas", 10),
+        )
+        self.log.pack(fill="both", expand=True, padx=10, pady=10)
         self._log("Готово. Нажми кнопку, выбери версию/заметки, проверь подтверждение.")
 
     def _build_content_tab(self) -> None:
-        tab = ttk.Frame(self.notebook, padding=12)
+        tab = ttk.Frame(self.notebook, padding=14)
         self.notebook.add(tab, text="MO2 / DB")
 
-        mo2 = ttk.Labelframe(tab, text="MO2 модпак", padding=12)
-        mo2.pack(fill="x", pady=(0, 12))
-        ttk.Label(mo2, text="Публикует D:\\Games\\...\\mods в anthology-mo2-modpack main.zip.", style="Muted.TLabel").pack(anchor="w")
+        mo2 = ttk.Labelframe(tab, text="MO2 модпак", padding=14)
+        mo2.pack(fill="x", pady=(0, 14))
+        ttk.Label(mo2, text="Публикует папку mods в anthology-mo2-modpack main.zip.", style="CardMuted.TLabel").pack(anchor="w")
         row = ttk.Frame(mo2)
-        row.pack(fill="x", pady=(10, 0))
-        ttk.Button(row, text="Показать git-статус MO2", command=lambda: self.run_git_status(MODPACK_DIR)).pack(side="left", padx=(0, 8))
-        ttk.Button(row, text="Предпросмотр удалений", command=self.preview_modpack_removed).pack(side="left", padx=(0, 8))
+        row.pack(fill="x", pady=(12, 0))
+        ttk.Button(row, text="Git-статус", command=lambda: self.run_git_status(MODPACK_DIR)).pack(side="left", padx=(0, 8))
+        ttk.Button(row, text="Что удалится", command=self.preview_modpack_removed).pack(side="left", padx=(0, 8))
         ttk.Button(row, text="Опубликовать MO2", command=self.publish_mo2, style="Accent.TButton").pack(side="left")
 
-        db = ttk.Labelframe(tab, text="DB / Work Git", padding=12)
+        db = ttk.Labelframe(tab, text="DB / Work Git", padding=14)
         db.pack(fill="x")
-        ttk.Label(db, text="Сканирует live db/configs, db/mods и shaders_anthology.xdb0, затем грузит release assets.", style="Muted.TLabel").pack(anchor="w")
+        ttk.Label(db, text="Сканирует live db/configs, db/mods и shaders_anthology.xdb0, затем грузит release assets.", style="CardMuted.TLabel").pack(anchor="w")
         row = ttk.Frame(db)
-        row.pack(fill="x", pady=(10, 0))
-        ttk.Button(row, text="Показать git-статус Work Git", command=lambda: self.run_git_status(WORKGIT_DIR)).pack(side="left", padx=(0, 8))
+        row.pack(fill="x", pady=(12, 0))
+        ttk.Button(row, text="Git-статус", command=lambda: self.run_git_status(WORKGIT_DIR)).pack(side="left", padx=(0, 8))
         ttk.Button(row, text="Опубликовать DB", command=self.publish_db, style="Accent.TButton").pack(side="left")
 
     def _build_launcher_tab(self) -> None:
-        tab = ttk.Frame(self.notebook, padding=12)
+        tab = ttk.Frame(self.notebook, padding=14)
         self.notebook.add(tab, text="Лаунчер и новости")
 
-        launcher = ttk.Labelframe(tab, text="Лаунчер", padding=12)
-        launcher.pack(fill="x", pady=(0, 12))
-        ttk.Label(launcher, text="Сборка exe, commit/push и замена AnomalyLauncher.exe в latest release. exe_url всегда пишется с ?v=версия.", style="Muted.TLabel").pack(anchor="w")
+        launcher = ttk.Labelframe(tab, text="Лаунчер", padding=14)
+        launcher.pack(fill="x", pady=(0, 14))
+        ttk.Label(launcher, text="Сборка exe, commit/push и замена AnomalyLauncher.exe в latest release. exe_url всегда пишется с ?v=версия.", style="CardMuted.TLabel").pack(anchor="w")
         row = ttk.Frame(launcher)
-        row.pack(fill="x", pady=(10, 0))
+        row.pack(fill="x", pady=(12, 0))
         ttk.Button(row, text="Git-статус лаунчера", command=lambda: self.run_git_status(LAUNCHER_DIR)).pack(side="left", padx=(0, 8))
-        ttk.Button(row, text="Проверить публичный manifest/exe", command=self.check_launcher_public).pack(side="left", padx=(0, 8))
+        ttk.Button(row, text="Проверить manifest/exe", command=self.check_launcher_public).pack(side="left", padx=(0, 8))
 
-        news = ttk.Labelframe(tab, text="Новости лаунчера", padding=12)
+        news = ttk.Labelframe(tab, text="Новости лаунчера", padding=14)
         news.pack(fill="both", expand=True)
         top = ttk.Frame(news)
-        top.pack(fill="x", pady=(0, 8))
+        top.pack(fill="x", pady=(0, 10))
         ttk.Button(top, text="Обновить список", command=self.refresh_news).pack(side="left", padx=(0, 8))
         ttk.Button(top, text="Добавить сверху", command=self.add_news).pack(side="left", padx=(0, 8))
         ttk.Button(top, text="Редактировать выбранную", command=self.edit_news).pack(side="left", padx=(0, 8))
@@ -219,26 +281,26 @@ class ReleaseControl(tk.Tk):
         self.news_tree.heading("index", text="#")
         self.news_tree.heading("title", text="Заголовок")
         self.news_tree.heading("body", text="Текст")
-        self.news_tree.column("index", width=48, stretch=False, anchor="center")
-        self.news_tree.column("title", width=280)
+        self.news_tree.column("index", width=54, stretch=False, anchor="center")
+        self.news_tree.column("title", width=300)
         self.news_tree.column("body", width=620)
         self.news_tree.pack(fill="both", expand=True)
 
     def _build_engine_tab(self) -> None:
-        tab = ttk.Frame(self.notebook, padding=12)
+        tab = ttk.Frame(self.notebook, padding=14)
         self.notebook.add(tab, text="MT движок")
 
-        box = ttk.Labelframe(tab, text="MT engine", padding=12)
+        box = ttk.Labelframe(tab, text="MT engine", padding=14)
         box.pack(fill="x")
-        ttk.Label(box, text="Сборка/упаковка движка и повторный upload ZIP в release.", style="Muted.TLabel").pack(anchor="w")
+        ttk.Label(box, text="Сборка/упаковка движка и повторный upload ZIP в release.", style="CardMuted.TLabel").pack(anchor="w")
         row = ttk.Frame(box)
-        row.pack(fill="x", pady=(10, 0))
-        ttk.Button(row, text="Git-статус engine", command=lambda: self.run_git_status(ENGINE_DIR)).pack(side="left", padx=(0, 8))
+        row.pack(fill="x", pady=(12, 0))
+        ttk.Button(row, text="Git-статус", command=lambda: self.run_git_status(ENGINE_DIR)).pack(side="left", padx=(0, 8))
         ttk.Button(row, text="Опубликовать MT", command=self.publish_engine, style="Accent.TButton").pack(side="left", padx=(0, 8))
         ttk.Button(row, text="Повторить upload ZIP", command=self.retry_engine_upload).pack(side="left")
 
     def _build_status_tab(self) -> None:
-        tab = ttk.Frame(self.notebook, padding=12)
+        tab = ttk.Frame(self.notebook, padding=14)
         self.notebook.add(tab, text="Статусы")
         ttk.Label(tab, text="Быстрая проверка рабочих деревьев перед публикацией.", style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
         row = ttk.Frame(tab)
