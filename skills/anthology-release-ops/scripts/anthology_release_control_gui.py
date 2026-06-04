@@ -146,6 +146,7 @@ class ReleaseControl(tk.Tk):
         self.queue: queue.Queue[tuple[str, str]] = queue.Queue()
         self.running = False
         self.news_items: list[dict] = []
+        self.news_items_en: list[dict] = []
 
         self._build_style()
         self._build_ui()
@@ -276,14 +277,16 @@ class ReleaseControl(tk.Tk):
         ttk.Button(top, text="Редактировать выбранную", command=self.edit_news).pack(side="left", padx=(0, 8))
         ttk.Button(top, text="Удалить выбранную", command=self.delete_news, style="Danger.TButton").pack(side="left")
 
-        columns = ("index", "title", "body")
+        columns = ("index", "title", "title_en", "body")
         self.news_tree = ttk.Treeview(news, columns=columns, show="headings", height=12)
         self.news_tree.heading("index", text="#")
-        self.news_tree.heading("title", text="Заголовок")
-        self.news_tree.heading("body", text="Текст")
+        self.news_tree.heading("title", text="RU заголовок")
+        self.news_tree.heading("title_en", text="EN title")
+        self.news_tree.heading("body", text="RU текст")
         self.news_tree.column("index", width=54, stretch=False, anchor="center")
-        self.news_tree.column("title", width=300)
-        self.news_tree.column("body", width=620)
+        self.news_tree.column("title", width=260)
+        self.news_tree.column("title_en", width=260)
+        self.news_tree.column("body", width=420)
         self.news_tree.pack(fill="both", expand=True)
 
     def _build_engine_tab(self) -> None:
@@ -327,7 +330,12 @@ class ReleaseControl(tk.Tk):
         threading.Thread(target=work, daemon=True).start()
 
     def refresh_news(self) -> None:
-        self.run_command([sys.executable, str(HELPER), "launcher-news-list"], WORKGIT_DIR, on_success=self._load_news_json, title="Список новостей")
+        self.run_command(
+            [sys.executable, str(HELPER), "launcher-news-list"],
+            WORKGIT_DIR,
+            on_success=lambda _out: self.refresh_news_silent(),
+            title="Список новостей",
+        )
 
     def refresh_news_silent(self) -> None:
         if self.running:
@@ -335,17 +343,24 @@ class ReleaseControl(tk.Tk):
 
         def work() -> None:
             try:
-                result = subprocess.run(
-                    [sys.executable, str(HELPER), "launcher-news-list"],
+                ru = subprocess.run(
+                    [sys.executable, str(HELPER), "launcher-news-list", "--lang", "ru"],
                     cwd=str(WORKGIT_DIR),
                     text=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                 )
-                if result.returncode == 0:
-                    self.queue.put(("news_json", result.stdout or ""))
+                en = subprocess.run(
+                    [sys.executable, str(HELPER), "launcher-news-list", "--lang", "en"],
+                    cwd=str(WORKGIT_DIR),
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
+                if ru.returncode == 0 and en.returncode == 0:
+                    self.queue.put(("news_json", json.dumps({"ru": ru.stdout or "", "en": en.stdout or ""})))
                 else:
-                    self.queue.put(("log", (result.stdout or "").rstrip()))
+                    self.queue.put(("log", ((ru.stdout or "") + "\n" + (en.stdout or "")).strip()))
             except Exception as exc:
                 self.queue.put(("log", f"Не удалось тихо обновить новости: {exc}"))
 
@@ -354,14 +369,35 @@ class ReleaseControl(tk.Tk):
     def _load_news_json(self, output: str) -> None:
         try:
             payload = json.loads(output)
-            self.news_items = payload.get("news", [])
+            if "ru" in payload and "en" in payload:
+                ru_payload = json.loads(payload["ru"])
+                en_payload = json.loads(payload["en"])
+            else:
+                ru_payload = payload
+                en_output = subprocess.run(
+                    [sys.executable, str(HELPER), "launcher-news-list", "--lang", "en"],
+                    cwd=str(WORKGIT_DIR),
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                ).stdout
+                en_payload = json.loads(en_output)
+            self.news_items = ru_payload.get("news", [])
+            self.news_items_en = en_payload.get("news", [])
         except Exception as exc:
             messagebox.showerror("Новости", f"Не удалось прочитать список новостей:\n{exc}")
             return
         self.news_tree.delete(*self.news_tree.get_children())
+        en_by_index = {int(item["index"]): item for item in self.news_items_en}
         for item in self.news_items:
+            en_item = en_by_index.get(int(item["index"]), {})
             body = str(item.get("body", "")).replace("\n", " ")
-            self.news_tree.insert("", "end", iid=str(item["index"]), values=(item["index"], item.get("title", ""), body))
+            self.news_tree.insert(
+                "",
+                "end",
+                iid=str(item["index"]),
+                values=(item["index"], item.get("title", ""), en_item.get("title", ""), body),
+            )
 
     def run_git_status(self, root: Path) -> None:
         self.run_command(["git", "status", "--short", "--branch"], root, title=f"git status: {root}")
@@ -428,17 +464,39 @@ class ReleaseControl(tk.Tk):
         version = self.ask_version("лаунчера")
         if not version:
             return
-        title = simpledialog.askstring("Новая новость", "Заголовок:", parent=self)
+        title = simpledialog.askstring("Новая новость RU", "Русский заголовок:", parent=self)
         if not title:
             return
-        body = MultilineDialog(self, "Новая новость", "Текст новости:").result
+        body = MultilineDialog(self, "Новая новость RU", "Русский текст новости:").result
         if not body:
+            return
+        title_en = simpledialog.askstring("New launcher news EN", "English title:", initialvalue=title, parent=self)
+        if title_en is None:
+            return
+        body_en = MultilineDialog(self, "New launcher news EN", "English news body:", initial=body).result
+        if body_en is None:
             return
         notes = f"Новость лаунчера: {title}"
         if not self.confirm_publish("новость лаунчера", version, LAUNCHER_DIR):
             return
         self.run_command(
-            [sys.executable, str(HELPER), "launcher-news", "--version", version, "--notes", notes, "--news-title", title, "--news-body", body],
+            [
+                sys.executable,
+                str(HELPER),
+                "launcher-news",
+                "--version",
+                version,
+                "--notes",
+                notes,
+                "--news-title",
+                title,
+                "--news-body",
+                body,
+                "--news-title-en",
+                title_en.strip() or title,
+                "--news-body-en",
+                body_en.strip() or body,
+            ],
             WORKGIT_DIR,
             on_success=lambda _out: self.refresh_news(),
             title=f"Add launcher news {version}",
@@ -452,24 +510,62 @@ class ReleaseControl(tk.Tk):
         index = int(selection[0])
         return next((item for item in self.news_items if int(item["index"]) == index), None)
 
+    def english_news_for(self, index: int) -> dict:
+        return next((item for item in self.news_items_en if int(item["index"]) == index), {})
+
     def edit_news(self) -> None:
         item = self.selected_news()
         if not item:
             return
+        en_item = self.english_news_for(int(item["index"]))
         version = self.ask_version("лаунчера")
         if not version:
             return
-        title = simpledialog.askstring("Редактировать новость", "Новый заголовок:", initialvalue=str(item["title"]), parent=self)
+        title = simpledialog.askstring("Редактировать новость RU", "Русский заголовок:", initialvalue=str(item["title"]), parent=self)
         if not title:
             return
-        body = MultilineDialog(self, "Редактировать новость", "Новый текст:", initial=str(item["body"])).result
+        body = MultilineDialog(self, "Редактировать новость RU", "Русский текст:", initial=str(item["body"])).result
         if not body:
+            return
+        title_en = simpledialog.askstring(
+            "Edit news EN",
+            "English title:",
+            initialvalue=str(en_item.get("title") or title),
+            parent=self,
+        )
+        if title_en is None:
+            return
+        body_en = MultilineDialog(
+            self,
+            "Edit news EN",
+            "English body:",
+            initial=str(en_item.get("body") or body),
+        ).result
+        if body_en is None:
             return
         index = str(item["index"])
         if not self.confirm_publish(f"редактирование новости #{index}", version, LAUNCHER_DIR):
             return
         self.run_command(
-            [sys.executable, str(HELPER), "launcher-news-edit", "--version", version, "--notes", f"Редактирование новости #{index}", "--index", index, "--news-title", title, "--news-body", body],
+            [
+                sys.executable,
+                str(HELPER),
+                "launcher-news-edit",
+                "--version",
+                version,
+                "--notes",
+                f"Редактирование новости #{index}",
+                "--index",
+                index,
+                "--news-title",
+                title,
+                "--news-body",
+                body,
+                "--news-title-en",
+                title_en.strip() or title,
+                "--news-body-en",
+                body_en.strip() or body,
+            ],
             WORKGIT_DIR,
             on_success=lambda _out: self.refresh_news(),
             title=f"Edit launcher news #{index}",
