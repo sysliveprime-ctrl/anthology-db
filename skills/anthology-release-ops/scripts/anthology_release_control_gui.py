@@ -195,6 +195,8 @@ class ReleaseControl(tk.Tk):
         self.news_items_en: list[dict] = []
         self.news_dirty = False
         self.text_context_widget: tk.Entry | tk.Text | None = None
+        self.news_selected_index: int | None = None
+        self.loading_news_form = False
 
         self._build_style()
         self._build_ui()
@@ -357,7 +359,7 @@ class ReleaseControl(tk.Tk):
         self.news_tree.column("index", width=54, stretch=False, anchor="center")
         self.news_tree.column("title", width=300)
         self.news_tree.pack(fill="both", expand=True)
-        self.news_tree.bind("<<TreeviewSelect>>", lambda _event: self.load_selected_news_into_form())
+        self.news_tree.bind("<<TreeviewSelect>>", self.on_news_select)
 
         self.news_ru_title = tk.StringVar()
         self.news_en_title = tk.StringVar()
@@ -564,7 +566,8 @@ class ReleaseControl(tk.Tk):
         threading.Thread(target=work, daemon=True).start()
 
     def refresh_news(self) -> None:
-        if self.news_dirty and not messagebox.askyesno("Новости", "В черновике есть неопубликованные изменения.\n\nСбросить их и заново загрузить новости из лаунчера?"):
+        has_draft_changes = self.news_dirty or self.news_form_differs_from_index(self.news_selected_index)
+        if has_draft_changes and not messagebox.askyesno("Новости", "В черновике есть неопубликованные изменения.\n\nСбросить их и заново загрузить новости из лаунчера?"):
             return
         self.run_command(
             [sys.executable, str(HELPER), "launcher-news-list"],
@@ -627,28 +630,32 @@ class ReleaseControl(tk.Tk):
         self.render_news_tree(select_index=1 if self.news_items else None)
 
     def render_news_tree(self, select_index: int | None = None) -> None:
-        self.news_tree.delete(*self.news_tree.get_children())
-        en_by_index = {int(item["index"]): item for item in self.news_items_en}
-        for item in self.news_items:
-            en_item = en_by_index.get(int(item["index"]), {})
-            ru_title = item.get("title", "") or "(новая новость)"
-            en_title = en_item.get("title", "") or "draft"
-            self.news_tree.insert(
-                "",
-                "end",
-                iid=str(item["index"]),
-                values=(item["index"], f"{ru_title} / {en_title}"),
-            )
-        if select_index is not None and self.news_tree.exists(str(select_index)):
-            self.news_tree.selection_set(str(select_index))
-            self.news_tree.see(str(select_index))
-            self.load_selected_news_into_form()
-        elif self.news_items and not self.news_tree.selection():
-            self.news_tree.selection_set(str(self.news_items[0]["index"]))
-            self.load_selected_news_into_form()
-        elif not self.news_items:
-            self.clear_news_form("Список пустой. Нажми 'Новая новость', чтобы добавить черновик.")
-        self.update_news_status()
+        self.loading_news_form = True
+        try:
+            self.news_tree.delete(*self.news_tree.get_children())
+            en_by_index = {int(item["index"]): item for item in self.news_items_en}
+            for item in self.news_items:
+                en_item = en_by_index.get(int(item["index"]), {})
+                ru_title = item.get("title", "") or "(новая новость)"
+                en_title = en_item.get("title", "") or "draft"
+                self.news_tree.insert(
+                    "",
+                    "end",
+                    iid=str(item["index"]),
+                    values=(item["index"], f"{ru_title} / {en_title}"),
+                )
+            if select_index is not None and self.news_tree.exists(str(select_index)):
+                self.news_tree.selection_set(str(select_index))
+                self.news_tree.see(str(select_index))
+                self.load_selected_news_into_form()
+            elif self.news_items and not self.news_tree.selection():
+                self.news_tree.selection_set(str(self.news_items[0]["index"]))
+                self.load_selected_news_into_form()
+            elif not self.news_items:
+                self.clear_news_form("Список пустой. Нажми 'Новая новость', чтобы добавить черновик.")
+            self.update_news_status()
+        finally:
+            self.loading_news_form = False
 
     def update_news_status(self) -> None:
         state = "есть неопубликованные изменения" if self.news_dirty else "без неопубликованных изменений"
@@ -766,6 +773,7 @@ class ReleaseControl(tk.Tk):
 
     def clear_news_form(self, label: str) -> None:
         self.news_tree.selection_remove(self.news_tree.selection())
+        self.news_selected_index = None
         self.news_selected_label.set(label)
         self.news_ru_title.set("")
         self.news_en_title.set("")
@@ -774,6 +782,7 @@ class ReleaseControl(tk.Tk):
         self.update_news_status()
 
     def new_news_draft(self) -> None:
+        self.save_news_form_to_index(self.news_selected_index, validate=False)
         self.news_items.insert(0, {"index": 0, "title": "", "body": ""})
         self.news_items_en.insert(0, {"index": 0, "title": "", "body": ""})
         self.reindex_news_items()
@@ -781,39 +790,79 @@ class ReleaseControl(tk.Tk):
         self.render_news_tree(select_index=1)
         self.news_selected_label.set("Новая новость в черновике: заполни поля справа и нажми 'Сохранить текст'.")
 
+    def on_news_select(self, _event=None) -> None:
+        if self.loading_news_form:
+            return
+        self.save_news_form_to_index(self.news_selected_index, validate=False)
+        self.load_selected_news_into_form()
+
     def load_selected_news_into_form(self) -> None:
         item = self.selected_news(warn=False)
         if not item:
             return
         index = int(item["index"])
         en_item = self.english_news_for(index)
+        self.news_selected_index = index
         self.news_selected_label.set(f"Выбрана: новость #{index}")
         self.news_ru_title.set(str(item.get("title", "")))
         self.set_text_value(self.news_ru_body, str(item.get("body", "")))
         self.news_en_title.set(str(en_item.get("title", "")))
         self.set_text_value(self.news_en_body, str(en_item.get("body", "")))
 
-    def edit_news(self) -> None:
-        item = self.selected_news()
+    def save_news_form_to_index(self, index: int | None, validate: bool = True) -> bool:
+        if index is None:
+            return True
+        item = next((entry for entry in self.news_items if int(entry["index"]) == index), None)
         if not item:
-            return
+            return True
         title, body, title_en, body_en = self.news_form_values()
-        if not title or not body:
+        if validate and (not title or not body):
             messagebox.showwarning("Новости", "Заполни хотя бы RU заголовок и RU текст.")
-            return
-        index = int(item["index"])
+            return False
+        changed = (
+            item.get("title", "") != title
+            or item.get("body", "") != body
+        )
         item["title"] = title
         item["body"] = body
         en_item = self.english_news_for(index)
         if en_item:
+            changed = changed or en_item.get("title", "") != title_en or en_item.get("body", "") != body_en
             en_item["title"] = title_en
             en_item["body"] = body_en
         else:
             self.news_items_en.append({"index": index, "title": title_en, "body": body_en})
-        self.news_dirty = True
+            changed = True
+        if changed:
+            self.news_dirty = True
+        return True
+
+    def news_form_differs_from_index(self, index: int | None) -> bool:
+        if index is None:
+            return False
+        item = next((entry for entry in self.news_items if int(entry["index"]) == index), None)
+        if not item:
+            return False
+        title, body, title_en, body_en = self.news_form_values()
+        en_item = self.english_news_for(index)
+        return (
+            item.get("title", "") != title
+            or item.get("body", "") != body
+            or en_item.get("title", "") != title_en
+            or en_item.get("body", "") != body_en
+        )
+
+    def edit_news(self) -> None:
+        item = self.selected_news()
+        if not item:
+            return
+        index = int(item["index"])
+        if not self.save_news_form_to_index(index, validate=True):
+            return
         self.render_news_tree(select_index=index)
 
     def delete_news(self) -> None:
+        self.save_news_form_to_index(self.news_selected_index, validate=False)
         item = self.selected_news()
         if not item:
             return
@@ -847,6 +896,9 @@ class ReleaseControl(tk.Tk):
         return Path(handle.name)
 
     def publish_news_changes(self) -> None:
+        if not self.save_news_form_to_index(self.news_selected_index, validate=False):
+            return
+        self.render_news_tree(select_index=self.news_selected_index)
         if not self.news_items:
             messagebox.showwarning("Новости", "Список новостей пустой. Оставь хотя бы одну новость.")
             return
