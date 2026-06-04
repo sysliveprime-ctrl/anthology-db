@@ -197,6 +197,8 @@ class ReleaseControl(tk.Tk):
         self.text_context_widget: tk.Entry | tk.Text | None = None
         self.news_selected_index: int | None = None
         self.loading_news_form = False
+        self.news_drag_index: int | None = None
+        self.news_drag_target: int | None = None
 
         self._build_style()
         self._build_ui()
@@ -360,6 +362,9 @@ class ReleaseControl(tk.Tk):
         self.news_tree.column("title", width=300)
         self.news_tree.pack(fill="both", expand=True)
         self.news_tree.bind("<<TreeviewSelect>>", self.on_news_select)
+        self.news_tree.bind("<ButtonPress-1>", self.on_news_drag_start)
+        self.news_tree.bind("<B1-Motion>", self.on_news_drag_motion)
+        self.news_tree.bind("<ButtonRelease-1>", self.on_news_drag_drop)
 
         self.news_ru_title = tk.StringVar()
         self.news_en_title = tk.StringVar()
@@ -673,6 +678,33 @@ class ReleaseControl(tk.Tk):
         self.news_items = new_ru
         self.news_items_en = new_en
 
+    def move_news_item(self, source_index: int, target_index: int) -> int:
+        if source_index == target_index:
+            return source_index
+        old_ru = list(self.news_items)
+        old_en_by_index = {int(item["index"]): item for item in self.news_items_en}
+        source_pos = next((pos for pos, item in enumerate(old_ru) if int(item["index"]) == source_index), None)
+        target_pos = next((pos for pos, item in enumerate(old_ru) if int(item["index"]) == target_index), None)
+        if source_pos is None or target_pos is None:
+            return source_index
+
+        item = old_ru.pop(source_pos)
+        old_ru.insert(target_pos, item)
+        new_ru: list[dict] = []
+        new_en: list[dict] = []
+        new_selected_index = 1
+        for new_index, ru_item in enumerate(old_ru, start=1):
+            old_index = int(ru_item["index"])
+            en_item = old_en_by_index.get(old_index, {})
+            if old_index == source_index:
+                new_selected_index = new_index
+            new_ru.append({"index": new_index, "title": ru_item.get("title", ""), "body": ru_item.get("body", "")})
+            new_en.append({"index": new_index, "title": en_item.get("title", ru_item.get("title", "")), "body": en_item.get("body", ru_item.get("body", ""))})
+        self.news_items = new_ru
+        self.news_items_en = new_en
+        self.news_dirty = True
+        return new_selected_index
+
     def run_git_status(self, root: Path) -> None:
         self.run_command(["git", "status", "--short", "--branch"], root, title=f"git status: {root}")
 
@@ -795,6 +827,40 @@ class ReleaseControl(tk.Tk):
             return
         self.save_news_form_to_index(self.news_selected_index, validate=False)
         self.load_selected_news_into_form()
+
+    def news_index_from_event(self, event) -> int | None:
+        row = self.news_tree.identify_row(event.y)
+        if not row:
+            return None
+        try:
+            return int(row)
+        except ValueError:
+            return None
+
+    def on_news_drag_start(self, event) -> None:
+        self.news_drag_index = self.news_index_from_event(event)
+        self.news_drag_target = self.news_drag_index
+
+    def on_news_drag_motion(self, event) -> None:
+        target = self.news_index_from_event(event)
+        if target is None or self.news_drag_index is None:
+            return
+        self.news_drag_target = target
+        if self.news_tree.exists(str(target)):
+            self.news_tree.selection_set(str(target))
+            self.news_tree.see(str(target))
+
+    def on_news_drag_drop(self, event) -> None:
+        source = self.news_drag_index
+        target = self.news_index_from_event(event) or self.news_drag_target
+        self.news_drag_index = None
+        self.news_drag_target = None
+        if source is None or target is None or source == target:
+            return
+        self.save_news_form_to_index(self.news_selected_index, validate=False)
+        new_index = self.move_news_item(source, target)
+        self.render_news_tree(select_index=new_index)
+        self.news_selected_label.set(f"Новость перемещена на позицию #{new_index}. Черновик ещё не опубликован.")
 
     def load_selected_news_into_form(self) -> None:
         item = self.selected_news(warn=False)
