@@ -199,6 +199,8 @@ class ReleaseControl(tk.Tk):
         self.loading_news_form = False
         self.news_drag_index: int | None = None
         self.news_drag_target: int | None = None
+        self.news_drag_source_title = ""
+        self.news_drag_ghost: tk.Toplevel | None = None
 
         self._build_style()
         self._build_ui()
@@ -354,6 +356,9 @@ class ReleaseControl(tk.Tk):
         form = ttk.Frame(editor, padding=(14, 0, 0, 0))
         editor.add(form, weight=3)
 
+        self.news_drag_label = tk.StringVar(value="Перетащи новость мышкой, чтобы поменять порядок.")
+        ttk.Label(list_frame, textvariable=self.news_drag_label, style="Muted.TLabel").pack(anchor="w", pady=(0, 6))
+
         columns = ("index", "title")
         self.news_tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=12)
         self.news_tree.heading("index", text="#")
@@ -361,6 +366,8 @@ class ReleaseControl(tk.Tk):
         self.news_tree.column("index", width=54, stretch=False, anchor="center")
         self.news_tree.column("title", width=300)
         self.news_tree.pack(fill="both", expand=True)
+        self.news_tree.tag_configure("drag_target", background="#2b7165", foreground="#ffffff")
+        self.news_tree.tag_configure("drag_source", background="#31424a", foreground="#ffffff")
         self.news_tree.bind("<<TreeviewSelect>>", self.on_news_select)
         self.news_tree.bind("<ButtonPress-1>", self.on_news_drag_start)
         self.news_tree.bind("<B1-Motion>", self.on_news_drag_motion)
@@ -840,12 +847,24 @@ class ReleaseControl(tk.Tk):
     def on_news_drag_start(self, event) -> None:
         self.news_drag_index = self.news_index_from_event(event)
         self.news_drag_target = self.news_drag_index
+        if self.news_drag_index is None:
+            return
+        item = next((entry for entry in self.news_items if int(entry["index"]) == self.news_drag_index), {})
+        self.news_drag_source_title = str(item.get("title", "")) or "(новая новость)"
+        self.news_tree.configure(cursor="hand2")
+        self.set_news_drag_tags(source=self.news_drag_index, target=self.news_drag_index)
+        self.news_drag_label.set(f"Тащишь #{self.news_drag_index}: {self.news_drag_source_title}")
+        self.show_news_drag_ghost(event)
 
     def on_news_drag_motion(self, event) -> None:
+        if self.news_drag_index is not None:
+            self.move_news_drag_ghost(event)
         target = self.news_index_from_event(event)
         if target is None or self.news_drag_index is None:
             return
         self.news_drag_target = target
+        self.set_news_drag_tags(source=self.news_drag_index, target=target)
+        self.news_drag_label.set(f"Тащишь #{self.news_drag_index} -> позиция #{target}: {self.news_drag_source_title}")
         if self.news_tree.exists(str(target)):
             self.news_tree.selection_set(str(target))
             self.news_tree.see(str(target))
@@ -855,12 +874,62 @@ class ReleaseControl(tk.Tk):
         target = self.news_index_from_event(event) or self.news_drag_target
         self.news_drag_index = None
         self.news_drag_target = None
+        self.news_tree.configure(cursor="")
+        self.clear_news_drag_tags()
+        self.hide_news_drag_ghost()
         if source is None or target is None or source == target:
+            self.news_drag_label.set("Перетащи новость мышкой, чтобы поменять порядок.")
             return
         self.save_news_form_to_index(self.news_selected_index, validate=False)
         new_index = self.move_news_item(source, target)
         self.render_news_tree(select_index=new_index)
+        self.news_drag_label.set(f"Готово: новость теперь на позиции #{new_index}.")
         self.news_selected_label.set(f"Новость перемещена на позицию #{new_index}. Черновик ещё не опубликован.")
+
+    def set_news_drag_tags(self, source: int, target: int) -> None:
+        self.clear_news_drag_tags()
+        if self.news_tree.exists(str(source)):
+            self.news_tree.item(str(source), tags=("drag_source",))
+        if target != source and self.news_tree.exists(str(target)):
+            self.news_tree.item(str(target), tags=("drag_target",))
+
+    def clear_news_drag_tags(self) -> None:
+        for iid in self.news_tree.get_children():
+            self.news_tree.item(iid, tags=())
+
+    def show_news_drag_ghost(self, event) -> None:
+        self.hide_news_drag_ghost()
+        ghost = tk.Toplevel(self)
+        ghost.overrideredirect(True)
+        ghost.attributes("-topmost", True)
+        ghost.configure(bg=COLORS["accent"])
+        label = tk.Label(
+            ghost,
+            text=f"#{self.news_drag_index}  {self.news_drag_source_title}",
+            bg=COLORS["panel"],
+            fg=COLORS["text"],
+            padx=12,
+            pady=7,
+            width=46,
+            anchor="w",
+            font=("Segoe UI Semibold", 9),
+        )
+        label.pack(padx=1, pady=1)
+        self.news_drag_ghost = ghost
+        self.move_news_drag_ghost(event)
+
+    def move_news_drag_ghost(self, event) -> None:
+        if not self.news_drag_ghost:
+            return
+        self.news_drag_ghost.geometry(f"+{event.x_root + 14}+{event.y_root + 14}")
+
+    def hide_news_drag_ghost(self) -> None:
+        if self.news_drag_ghost:
+            try:
+                self.news_drag_ghost.destroy()
+            except tk.TclError:
+                pass
+            self.news_drag_ghost = None
 
     def load_selected_news_into_form(self) -> None:
         item = self.selected_news(warn=False)
