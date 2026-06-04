@@ -93,6 +93,20 @@ class MultilineDialog(tk.Toplevel):
             self.text.bind(sequence, lambda event: self._text_event(event, "<<Cut>>"))
         for sequence in ("<Control-a>", "<Control-A>"):
             self.text.bind(sequence, lambda _event: self._select_all_event())
+        self.text.bind("<Control-KeyPress>", self._control_key_event)
+
+    def _control_key_event(self, event) -> str | None:
+        key = str(event.keysym).lower()
+        keycode = int(getattr(event, "keycode", 0) or 0)
+        if key in ("v", "м") or keycode == 86:
+            return self._paste_event()
+        if key in ("c", "с") or keycode == 67:
+            return self._text_event(event, "<<Copy>>")
+        if key in ("x", "ч") or keycode == 88:
+            return self._text_event(event, "<<Cut>>")
+        if key in ("a", "ф") or keycode == 65:
+            return self._select_all_event()
+        return None
 
     def _text_event(self, event, virtual_event: str) -> str:
         event.widget.event_generate(virtual_event)
@@ -276,10 +290,9 @@ class ReleaseControl(tk.Tk):
         top.pack(fill="x", pady=(0, 10))
         ttk.Button(top, text="Обновить список", command=self.refresh_news).pack(side="left", padx=(0, 8))
         ttk.Button(top, text="Новая новость", command=self.new_news_draft).pack(side="left", padx=(0, 8))
-        ttk.Button(top, text="Добавить сверху", command=self.add_news).pack(side="left", padx=(0, 8))
-        ttk.Button(top, text="Сохранить выбранную", command=self.edit_news).pack(side="left", padx=(0, 8))
+        ttk.Button(top, text="Сохранить текст", command=self.edit_news).pack(side="left", padx=(0, 8))
         ttk.Button(top, text="Удалить выбранную", command=self.delete_news, style="Danger.TButton").pack(side="left")
-        ttk.Button(top, text="Опубликовать изменения", command=self.publish_news_changes, style="Accent.TButton").pack(side="right")
+        ttk.Button(top, text="Опубликовать черновик", command=self.publish_news_changes, style="Accent.TButton").pack(side="right")
 
         editor = ttk.PanedWindow(news, orient="horizontal")
         editor.pack(fill="both", expand=True)
@@ -300,8 +313,8 @@ class ReleaseControl(tk.Tk):
 
         self.news_ru_title = tk.StringVar()
         self.news_en_title = tk.StringVar()
-        self.news_status = tk.StringVar(value="Черновик без изменений")
-        self.news_selected_label = tk.StringVar(value="Выбрана: новая новость")
+        self.news_status = tk.StringVar(value="Черновик: без изменений")
+        self.news_selected_label = tk.StringVar(value="Выбери новость слева или создай новую.")
         ttk.Label(form, textvariable=self.news_status, style="Muted.TLabel").pack(anchor="w", pady=(0, 6))
         ttk.Label(form, textvariable=self.news_selected_label, style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
         self._form_entry(form, "RU заголовок", self.news_ru_title)
@@ -345,6 +358,7 @@ class ReleaseControl(tk.Tk):
             borderwidth=0,
             font=("Segoe UI", 10),
         )
+        self.bind_text_input_shortcuts(entry)
         entry.pack(fill="x", pady=(0, 10))
 
     def _form_text(self, parent: ttk.Frame, label: str, height: int) -> tk.Text:
@@ -362,8 +376,88 @@ class ReleaseControl(tk.Tk):
             borderwidth=0,
             font=("Segoe UI", 10),
         )
+        self.bind_text_input_shortcuts(text)
         text.pack(fill="both", expand=True, pady=(0, 10))
         return text
+
+    def bind_text_input_shortcuts(self, widget: tk.Entry | tk.Text) -> None:
+        for sequence in ("<Control-v>", "<Control-V>", "<Shift-Insert>"):
+            widget.bind(sequence, self.paste_into_text_input)
+        for sequence in ("<Control-c>", "<Control-C>"):
+            widget.bind(sequence, self.copy_from_text_input)
+        for sequence in ("<Control-x>", "<Control-X>"):
+            widget.bind(sequence, self.cut_from_text_input)
+        for sequence in ("<Control-a>", "<Control-A>"):
+            widget.bind(sequence, self.select_all_text_input)
+        widget.bind("<Control-KeyPress>", self.control_key_text_input)
+
+    def control_key_text_input(self, event) -> str | None:
+        key = str(event.keysym).lower()
+        keycode = int(getattr(event, "keycode", 0) or 0)
+        if key in ("v", "м") or keycode == 86:
+            return self.paste_into_text_input(event)
+        if key in ("c", "с") or keycode == 67:
+            return self.copy_from_text_input(event)
+        if key in ("x", "ч") or keycode == 88:
+            return self.cut_from_text_input(event)
+        if key in ("a", "ф") or keycode == 65:
+            return self.select_all_text_input(event)
+        return None
+
+    def paste_into_text_input(self, event) -> str:
+        widget = event.widget
+        try:
+            value = self.clipboard_get()
+        except tk.TclError:
+            return "break"
+        if isinstance(widget, tk.Text):
+            try:
+                widget.delete("sel.first", "sel.last")
+            except tk.TclError:
+                pass
+            widget.insert("insert", value)
+        else:
+            try:
+                widget.delete("sel.first", "sel.last")
+            except tk.TclError:
+                pass
+            widget.insert("insert", value)
+        widget.focus_set()
+        return "break"
+
+    def copy_from_text_input(self, event) -> str:
+        widget = event.widget
+        try:
+            value = widget.get("sel.first", "sel.last") if isinstance(widget, tk.Text) else widget.selection_get()
+        except tk.TclError:
+            return "break"
+        self.clipboard_clear()
+        self.clipboard_append(value)
+        return "break"
+
+    def cut_from_text_input(self, event) -> str:
+        widget = event.widget
+        self.copy_from_text_input(event)
+        try:
+            if isinstance(widget, tk.Text):
+                widget.delete("sel.first", "sel.last")
+            else:
+                widget.delete("sel.first", "sel.last")
+        except tk.TclError:
+            pass
+        return "break"
+
+    def select_all_text_input(self, event) -> str:
+        widget = event.widget
+        if isinstance(widget, tk.Text):
+            widget.tag_add("sel", "1.0", "end-1c")
+            widget.mark_set("insert", "1.0")
+            widget.see("insert")
+        else:
+            widget.selection_range(0, "end")
+            widget.icursor("end")
+        widget.focus_set()
+        return "break"
 
     def refresh_versions(self, refresh_news: bool = False) -> None:
         def work() -> None:
@@ -451,11 +545,13 @@ class ReleaseControl(tk.Tk):
         en_by_index = {int(item["index"]): item for item in self.news_items_en}
         for item in self.news_items:
             en_item = en_by_index.get(int(item["index"]), {})
+            ru_title = item.get("title", "") or "(новая новость)"
+            en_title = en_item.get("title", "") or "draft"
             self.news_tree.insert(
                 "",
                 "end",
                 iid=str(item["index"]),
-                values=(item["index"], f"{item.get('title', '')} / {en_item.get('title', '')}"),
+                values=(item["index"], f"{ru_title} / {en_title}"),
             )
         if select_index is not None and self.news_tree.exists(str(select_index)):
             self.news_tree.selection_set(str(select_index))
@@ -465,7 +561,7 @@ class ReleaseControl(tk.Tk):
             self.news_tree.selection_set(str(self.news_items[0]["index"]))
             self.load_selected_news_into_form()
         elif not self.news_items:
-            self.new_news_draft()
+            self.clear_news_form("Список пустой. Нажми 'Новая новость', чтобы добавить черновик.")
         self.update_news_status()
 
     def update_news_status(self) -> None:
@@ -582,14 +678,22 @@ class ReleaseControl(tk.Tk):
         body_en = self.text_value(self.news_en_body) or body
         return title, body, title_en, body_en
 
-    def new_news_draft(self) -> None:
+    def clear_news_form(self, label: str) -> None:
         self.news_tree.selection_remove(self.news_tree.selection())
-        self.news_selected_label.set("Выбрана: новая новость")
+        self.news_selected_label.set(label)
         self.news_ru_title.set("")
         self.news_en_title.set("")
         self.set_text_value(self.news_ru_body, "")
         self.set_text_value(self.news_en_body, "")
         self.update_news_status()
+
+    def new_news_draft(self) -> None:
+        self.news_items.insert(0, {"index": 0, "title": "", "body": ""})
+        self.news_items_en.insert(0, {"index": 0, "title": "", "body": ""})
+        self.reindex_news_items()
+        self.news_dirty = True
+        self.render_news_tree(select_index=1)
+        self.news_selected_label.set("Новая новость в черновике: заполни поля справа и нажми 'Сохранить текст'.")
 
     def load_selected_news_into_form(self) -> None:
         item = self.selected_news(warn=False)
