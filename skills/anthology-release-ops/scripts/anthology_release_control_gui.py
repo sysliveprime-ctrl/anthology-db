@@ -34,16 +34,64 @@ class MultilineDialog(tk.Toplevel):
         self.text = scrolledtext.ScrolledText(self, width=72, height=12, wrap="word")
         self.text.pack(fill="both", expand=True, padx=12, pady=6)
         self.text.insert("1.0", initial)
+        self._bind_text_shortcuts()
 
         buttons = ttk.Frame(self)
         buttons.pack(fill="x", padx=12, pady=(6, 12))
         ttk.Button(buttons, text="OK", command=self._ok).pack(side="right", padx=(6, 0))
         ttk.Button(buttons, text="Отмена", command=self._cancel).pack(side="right")
+        ttk.Button(buttons, text="Вставить", command=self._paste).pack(side="left")
+        ttk.Button(buttons, text="Выделить всё", command=self._select_all).pack(side="left", padx=(6, 0))
+        ttk.Button(buttons, text="Очистить", command=self._clear).pack(side="left", padx=(6, 0))
 
         self.bind("<Escape>", lambda _event: self._cancel())
         self.geometry("720x360")
         self.text.focus_set()
         self.wait_window(self)
+
+    def _bind_text_shortcuts(self) -> None:
+        for sequence in ("<Control-v>", "<Control-V>", "<Shift-Insert>"):
+            self.text.bind(sequence, lambda _event: self._paste_event())
+        for sequence in ("<Control-c>", "<Control-C>"):
+            self.text.bind(sequence, lambda event: self._text_event(event, "<<Copy>>"))
+        for sequence in ("<Control-x>", "<Control-X>"):
+            self.text.bind(sequence, lambda event: self._text_event(event, "<<Cut>>"))
+        for sequence in ("<Control-a>", "<Control-A>"):
+            self.text.bind(sequence, lambda _event: self._select_all_event())
+
+    def _text_event(self, event, virtual_event: str) -> str:
+        event.widget.event_generate(virtual_event)
+        return "break"
+
+    def _paste_event(self) -> str:
+        self._paste()
+        return "break"
+
+    def _select_all_event(self) -> str:
+        self._select_all()
+        return "break"
+
+    def _paste(self) -> None:
+        try:
+            value = self.clipboard_get()
+        except tk.TclError:
+            return
+        try:
+            self.text.delete("sel.first", "sel.last")
+        except tk.TclError:
+            pass
+        self.text.insert("insert", value)
+        self.text.focus_set()
+
+    def _select_all(self) -> None:
+        self.text.tag_add("sel", "1.0", "end-1c")
+        self.text.mark_set("insert", "1.0")
+        self.text.see("insert")
+        self.text.focus_set()
+
+    def _clear(self) -> None:
+        self.text.delete("1.0", "end")
+        self.text.focus_set()
 
     def _ok(self) -> None:
         self.result = self.text.get("1.0", "end").strip()
