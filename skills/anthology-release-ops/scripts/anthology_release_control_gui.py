@@ -328,7 +328,18 @@ class ReleaseControl(tk.Tk):
 
     def _form_entry(self, parent: ttk.Frame, label: str, variable: tk.StringVar) -> None:
         ttk.Label(parent, text=label, style="Muted.TLabel").pack(anchor="w", pady=(0, 4))
-        entry = ttk.Entry(parent, textvariable=variable)
+        entry = tk.Entry(
+            parent,
+            textvariable=variable,
+            bg=COLORS["log_bg"],
+            fg=COLORS["log_text"],
+            insertbackground=COLORS["log_text"],
+            selectbackground="#245d55",
+            selectforeground="#ffffff",
+            relief="flat",
+            borderwidth=0,
+            font=("Segoe UI", 10),
+        )
         entry.pack(fill="x", pady=(0, 10))
 
     def _form_text(self, parent: ttk.Frame, label: str, height: int) -> tk.Text:
