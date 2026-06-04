@@ -69,6 +69,7 @@ class MultilineDialog(tk.Toplevel):
         )
         self.text.pack(fill="both", expand=True, padx=12, pady=6)
         self.text.insert("1.0", initial)
+        self._build_context_menu()
         self._bind_text_shortcuts()
 
         buttons = ttk.Frame(self)
@@ -84,9 +85,25 @@ class MultilineDialog(tk.Toplevel):
         self.text.focus_set()
         self.wait_window(self)
 
+    def _build_context_menu(self) -> None:
+        self.context_menu = tk.Menu(
+            self,
+            tearoff=False,
+            bg=COLORS["panel"],
+            fg=COLORS["text"],
+            activebackground=COLORS["button_hover"],
+            activeforeground=COLORS["text"],
+        )
+        self.context_menu.add_command(label="Вставить", command=self._paste)
+        self.context_menu.add_command(label="Копировать", command=lambda: self.text.event_generate("<<Copy>>"))
+        self.context_menu.add_command(label="Вырезать", command=lambda: self.text.event_generate("<<Cut>>"))
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Выделить всё", command=self._select_all)
+
     def _bind_text_shortcuts(self) -> None:
         for sequence in ("<Control-v>", "<Control-V>", "<Shift-Insert>"):
             self.text.bind(sequence, lambda _event: self._paste_event())
+        self.text.bind("<<Paste>>", lambda _event: self._paste_event())
         for sequence in ("<Control-c>", "<Control-C>"):
             self.text.bind(sequence, lambda event: self._text_event(event, "<<Copy>>"))
         for sequence in ("<Control-x>", "<Control-X>"):
@@ -94,19 +111,33 @@ class MultilineDialog(tk.Toplevel):
         for sequence in ("<Control-a>", "<Control-A>"):
             self.text.bind(sequence, lambda _event: self._select_all_event())
         self.text.bind("<Control-KeyPress>", self._control_key_event)
+        self.text.bind("<KeyPress>", self._any_key_event)
+        self.text.bind("<Button-3>", self._show_context_menu)
+        self.text.bind("<Button-2>", self._show_context_menu)
+
+    def _any_key_event(self, event) -> str | None:
+        if bool(int(getattr(event, "state", 0) or 0) & 0x4):
+            return self._control_key_event(event)
+        return None
 
     def _control_key_event(self, event) -> str | None:
         key = str(event.keysym).lower()
+        char = str(getattr(event, "char", "")).lower()
         keycode = int(getattr(event, "keycode", 0) or 0)
-        if key in ("v", "м") or keycode == 86:
+        if key in ("v", "м", "cyrillic_em") or char in ("v", "м") or keycode == 86:
             return self._paste_event()
-        if key in ("c", "с") or keycode == 67:
+        if key in ("c", "с", "cyrillic_es") or char in ("c", "с") or keycode == 67:
             return self._text_event(event, "<<Copy>>")
-        if key in ("x", "ч") or keycode == 88:
+        if key in ("x", "ч", "cyrillic_che") or char in ("x", "ч") or keycode == 88:
             return self._text_event(event, "<<Cut>>")
-        if key in ("a", "ф") or keycode == 65:
+        if key in ("a", "ф", "cyrillic_ef") or char in ("a", "ф") or keycode == 65:
             return self._select_all_event()
         return None
+
+    def _show_context_menu(self, event) -> str:
+        self.text.focus_set()
+        self.context_menu.tk_popup(event.x_root, event.y_root)
+        return "break"
 
     def _text_event(self, event, virtual_event: str) -> str:
         event.widget.event_generate(virtual_event)
@@ -163,6 +194,7 @@ class ReleaseControl(tk.Tk):
         self.news_items: list[dict] = []
         self.news_items_en: list[dict] = []
         self.news_dirty = False
+        self.text_context_widget: tk.Entry | tk.Text | None = None
 
         self._build_style()
         self._build_ui()
@@ -249,7 +281,23 @@ class ReleaseControl(tk.Tk):
             font=("Consolas", 10),
         )
         self.log.pack(fill="both", expand=True, padx=10, pady=10)
+        self._build_text_context_menu()
         self._log("Готово. Нажми кнопку, выбери версию/заметки, проверь подтверждение.")
+
+    def _build_text_context_menu(self) -> None:
+        self.text_context_menu = tk.Menu(
+            self,
+            tearoff=False,
+            bg=COLORS["panel"],
+            fg=COLORS["text"],
+            activebackground=COLORS["button_hover"],
+            activeforeground=COLORS["text"],
+        )
+        self.text_context_menu.add_command(label="Вставить", command=lambda: self.menu_text_action("paste"))
+        self.text_context_menu.add_command(label="Копировать", command=lambda: self.menu_text_action("copy"))
+        self.text_context_menu.add_command(label="Вырезать", command=lambda: self.menu_text_action("cut"))
+        self.text_context_menu.add_separator()
+        self.text_context_menu.add_command(label="Выделить всё", command=lambda: self.menu_text_action("select_all"))
 
     def _build_content_tab(self) -> None:
         tab = ttk.Frame(self.notebook, padding=14)
@@ -383,26 +431,64 @@ class ReleaseControl(tk.Tk):
     def bind_text_input_shortcuts(self, widget: tk.Entry | tk.Text) -> None:
         for sequence in ("<Control-v>", "<Control-V>", "<Shift-Insert>"):
             widget.bind(sequence, self.paste_into_text_input)
+        widget.bind("<<Paste>>", self.paste_into_text_input)
         for sequence in ("<Control-c>", "<Control-C>"):
             widget.bind(sequence, self.copy_from_text_input)
+        widget.bind("<<Copy>>", self.copy_from_text_input)
         for sequence in ("<Control-x>", "<Control-X>"):
             widget.bind(sequence, self.cut_from_text_input)
+        widget.bind("<<Cut>>", self.cut_from_text_input)
         for sequence in ("<Control-a>", "<Control-A>"):
             widget.bind(sequence, self.select_all_text_input)
         widget.bind("<Control-KeyPress>", self.control_key_text_input)
+        widget.bind("<KeyPress>", self.any_key_text_input)
+        widget.bind("<Button-3>", self.show_text_context_menu)
+        widget.bind("<Button-2>", self.show_text_context_menu)
+
+    def is_control_pressed(self, event) -> bool:
+        return bool(int(getattr(event, "state", 0) or 0) & 0x4)
+
+    def is_key(self, event, latin: str, cyrillic_keysym: str, cyrillic_letter: str, vk_code: int) -> bool:
+        key = str(getattr(event, "keysym", "")).lower()
+        char = str(getattr(event, "char", "")).lower()
+        keycode = int(getattr(event, "keycode", 0) or 0)
+        return key in (latin, cyrillic_keysym.lower(), cyrillic_letter) or char in (latin, cyrillic_letter) or keycode == vk_code
+
+    def any_key_text_input(self, event) -> str | None:
+        if self.is_control_pressed(event):
+            return self.control_key_text_input(event)
+        return None
 
     def control_key_text_input(self, event) -> str | None:
-        key = str(event.keysym).lower()
-        keycode = int(getattr(event, "keycode", 0) or 0)
-        if key in ("v", "м") or keycode == 86:
+        if self.is_key(event, "v", "Cyrillic_em", "м", 86):
             return self.paste_into_text_input(event)
-        if key in ("c", "с") or keycode == 67:
+        if self.is_key(event, "c", "Cyrillic_es", "с", 67):
             return self.copy_from_text_input(event)
-        if key in ("x", "ч") or keycode == 88:
+        if self.is_key(event, "x", "Cyrillic_che", "ч", 88):
             return self.cut_from_text_input(event)
-        if key in ("a", "ф") or keycode == 65:
+        if self.is_key(event, "a", "Cyrillic_ef", "ф", 65):
             return self.select_all_text_input(event)
         return None
+
+    def show_text_context_menu(self, event) -> str:
+        self.text_context_widget = event.widget
+        event.widget.focus_set()
+        self.text_context_menu.tk_popup(event.x_root, event.y_root)
+        return "break"
+
+    def menu_text_action(self, action: str) -> None:
+        widget = self.text_context_widget or self.focus_get()
+        if not isinstance(widget, (tk.Entry, tk.Text)):
+            return
+        event = type("TextMenuEvent", (), {"widget": widget})()
+        if action == "paste":
+            self.paste_into_text_input(event)
+        elif action == "copy":
+            self.copy_from_text_input(event)
+        elif action == "cut":
+            self.cut_from_text_input(event)
+        elif action == "select_all":
+            self.select_all_text_input(event)
 
     def paste_into_text_input(self, event) -> str:
         widget = event.widget
