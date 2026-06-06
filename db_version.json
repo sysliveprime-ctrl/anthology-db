@@ -1,7 +1,7 @@
 {
-  "version": "2026.06.06.1",
+  "version": "2026.06.06.2",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.06.1/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.06.2/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -18,8 +18,8 @@
     {
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
-      "size": 12828444,
-      "sha256": "d5adfea6a3327ee30bc207a3a92b23c3beed146bba2758937560d7be8d09682a"
+      "size": 12850297,
+      "sha256": "f16508f03d43069711642d1ce04c8050d5d2342810c34b4644f4539c63309377"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -42,8 +42,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1384012,
-      "sha256": "f21c47ea37321901e84431699fd627e95accdfa723fcda9ee74f30151c3501a4"
+      "size": 1385344,
+      "sha256": "961b1facb540cd9aa0bd3d8a278ba8435141909cc4f5bb2d67c658fd435e47b8"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
