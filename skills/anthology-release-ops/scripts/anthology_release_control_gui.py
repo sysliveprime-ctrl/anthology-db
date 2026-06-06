@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import queue
 import subprocess
@@ -20,6 +21,20 @@ HELPER = WORKGIT_DIR / "skills" / "anthology-release-ops" / "scripts" / "antholo
 LAUNCHER_DIR = WORKGIT_DIR / "projects" / "AnthologyLauncher"
 MODPACK_DIR = Path(r"D:\Games\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods")
 ENGINE_DIR = Path(r"E:\dev\xray-monolith")
+LIVE_GAME_DIR = Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1")
+DB_SOURCE_DIRS = {
+    "configs": LIVE_GAME_DIR / "db" / "configs",
+    "mods": LIVE_GAME_DIR / "db" / "mods",
+}
+DB_SOURCE_FILES = {
+    "db/shaders_anthology.xdb0": LIVE_GAME_DIR / "db" / "shaders_anthology.xdb0",
+    "db/textures/textures_trees.xdb0": LIVE_GAME_DIR / "db" / "textures" / "textures_trees.xdb0",
+    "db/textures/textures_trees.xdb1": LIVE_GAME_DIR / "db" / "textures" / "textures_trees.xdb1",
+    "db/textures/textures_trees.xdb3": LIVE_GAME_DIR / "db" / "textures" / "textures_trees.xdb3",
+}
+DB_EXCLUDED_REL_PATHS = {
+    "db/mods/00_modded_exes_gamedata.db0",
+}
 
 COLORS = {
     "bg": "#0f1417",
@@ -40,6 +55,141 @@ COLORS = {
     "log_bg": "#070a0c",
     "log_text": "#d7f7ee",
 }
+
+
+def read_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def db_asset_name(rel_path: str) -> str:
+    return rel_path.replace("/", "_").replace("[", "").replace("]", "").replace(" ", "_")
+
+
+def live_db_files() -> dict[str, dict]:
+    files: dict[str, dict] = {}
+    for folder, base in DB_SOURCE_DIRS.items():
+        if not base.exists():
+            continue
+        for path in sorted(base.rglob("*")):
+            if not path.is_file():
+                continue
+            rel = (Path("db") / folder / path.relative_to(base)).as_posix()
+            if rel.casefold() in DB_EXCLUDED_REL_PATHS:
+                continue
+            files[rel] = {
+                "path": rel,
+                "asset_name": db_asset_name(rel),
+                "size": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+    for rel, path in DB_SOURCE_FILES.items():
+        if path.exists() and rel.casefold() not in DB_EXCLUDED_REL_PATHS:
+            files[rel] = {
+                "path": rel,
+                "asset_name": db_asset_name(rel),
+                "size": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+    return files
+
+
+def summarize_db_changes(manifest_path: Path) -> dict[str, list[str]]:
+    current = {entry["path"]: entry for entry in read_json(manifest_path).get("files", [])}
+    live = live_db_files()
+    added = sorted(set(live) - set(current))
+    removed = sorted(set(current) - set(live))
+    changed = sorted(
+        path
+        for path in set(live) & set(current)
+        if live[path].get("size") != current[path].get("size")
+        or live[path].get("sha256") != current[path].get("sha256")
+    )
+    return {"added": added, "changed": changed, "removed": removed}
+
+
+def format_db_changes(changes: dict[str, list[str]], limit: int = 28) -> str:
+    labels = [("added", "Добавлено"), ("changed", "Изменено"), ("removed", "Удалено")]
+    lines: list[str] = []
+    remaining = limit
+    for key, label in labels:
+        values = changes.get(key, [])
+        if not values:
+            lines.append(f"{label}: 0")
+            continue
+        lines.append(f"{label}: {len(values)}")
+        shown = values[: max(0, remaining)]
+        for value in shown:
+            lines.append(f"  {value}")
+        remaining -= len(shown)
+        if len(shown) < len(values):
+            lines.append(f"  ... еще {len(values) - len(shown)}")
+    return "\n".join(lines)
+
+
+def summarize_git_changes(root: Path) -> dict[str, list[str]]:
+    result = subprocess.run(
+        ["git", "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z"],
+        cwd=str(root),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+    items = [item for item in result.stdout.decode("utf-8", errors="replace").split("\0") if item]
+    changes = {"added": [], "changed": [], "removed": [], "renamed": [], "untracked": []}
+    index = 0
+    while index < len(items):
+        item = items[index]
+        status = item[:2]
+        path = item[3:]
+        index += 1
+        if "R" in status or "C" in status:
+            new_path = items[index] if index < len(items) else path
+            index += 1
+            changes["renamed"].append(f"{path} -> {new_path}")
+        elif status == "??":
+            changes["untracked"].append(path)
+        elif "D" in status:
+            changes["removed"].append(path)
+        elif "A" in status:
+            changes["added"].append(path)
+        else:
+            changes["changed"].append(path)
+    for values in changes.values():
+        values.sort(key=str.casefold)
+    return changes
+
+
+def format_git_changes(changes: dict[str, list[str]], limit: int = 34) -> str:
+    labels = [
+        ("changed", "Изменено"),
+        ("added", "Добавлено"),
+        ("removed", "Удалено"),
+        ("renamed", "Переименовано"),
+        ("untracked", "Новые файлы/папки"),
+    ]
+    lines: list[str] = []
+    remaining = limit
+    for key, label in labels:
+        values = changes.get(key, [])
+        if not values:
+            lines.append(f"{label}: 0")
+            continue
+        lines.append(f"{label}: {len(values)}")
+        shown = values[: max(0, remaining)]
+        for value in shown:
+            lines.append(f"  {value}")
+        remaining -= len(shown)
+        if len(shown) < len(values):
+            lines.append(f"  ... еще {len(values) - len(shown)}")
+    return "\n".join(lines)
 
 
 class MultilineDialog(tk.Toplevel):
@@ -731,7 +881,7 @@ class ReleaseControl(tk.Tk):
         notes = self.ask_notes("Заметки MO2", "Обновление MO2 модпака.")
         if notes is None:
             return
-        if not self.confirm_publish("MO2", version, MODPACK_DIR):
+        if not self.confirm_publish_mo2(version):
             return
         self.run_command([sys.executable, str(HELPER), "modpack", "--version", version, "--notes", notes], WORKGIT_DIR, title=f"Publish MO2 {version}")
 
@@ -742,7 +892,7 @@ class ReleaseControl(tk.Tk):
         notes = self.ask_notes("Заметки DB", "Обновление DB Anthology.")
         if notes is None:
             return
-        if not self.confirm_publish("DB", version, WORKGIT_DIR):
+        if not self.confirm_publish_db(version):
             return
         self.run_command([sys.executable, str(HELPER), "workgit", "--version", version, "--notes", notes], WORKGIT_DIR, title=f"Publish DB {version}")
 
@@ -1142,6 +1292,43 @@ class ReleaseControl(tk.Tk):
             "Проверь внимательно. После OK команда может сделать commit/push/upload."
         )
         return messagebox.askyesno("Подтверждение публикации", message)
+
+    def confirm_publish_db(self, version: str) -> bool:
+        try:
+            changes = summarize_db_changes(WORKGIT_DIR / "db_version.json")
+            summary = format_db_changes(changes)
+        except Exception as exc:
+            summary = f"Не удалось собрать список DB-изменений:\n{exc}"
+        message = (
+            f"Опубликовать DB версии {version}?\n\n"
+            "Источник DB:\n"
+            f"{LIVE_GAME_DIR / 'db'}\n\n"
+            "Будут опубликованы только DB assets из правил:\n"
+            "  db/configs/*\n"
+            "  db/mods/*\n"
+            "  db/shaders_anthology.xdb0\n"
+            "  db/textures/textures_trees.xdb0\n"
+            "  db/textures/textures_trees.xdb1\n"
+            "  db/textures/textures_trees.xdb3\n\n"
+            f"DB изменения:\n{summary}\n\n"
+            "После OK команда обновит db_version.json, сделает commit/push только этого манифеста и загрузит release assets."
+        )
+        return messagebox.askyesno("Подтверждение публикации DB", message)
+
+    def confirm_publish_mo2(self, version: str) -> bool:
+        try:
+            changes = summarize_git_changes(MODPACK_DIR)
+            summary = format_git_changes(changes)
+        except Exception as exc:
+            summary = f"Не удалось собрать список MO2-изменений:\n{exc}"
+        message = (
+            f"Опубликовать MO2 версии {version}?\n\n"
+            "Рабочая папка:\n"
+            f"{MODPACK_DIR}\n\n"
+            f"MO2 изменения:\n{summary}\n\n"
+            "После OK команда обновит version.json, сделает commit/push и игроки получат новый main.zip."
+        )
+        return messagebox.askyesno("Подтверждение публикации MO2", message)
 
     def capture(self, args: list[str], cwd: Path) -> str:
         result = subprocess.run(args, cwd=str(cwd), text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)

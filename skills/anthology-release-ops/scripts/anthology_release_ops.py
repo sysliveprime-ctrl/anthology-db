@@ -30,6 +30,9 @@ DB_SOURCE_DIRS = {
 }
 DB_SOURCE_FILES = {
     "db/shaders_anthology.xdb0": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0"),
+    "db/textures/textures_trees.xdb0": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\textures\textures_trees.xdb0"),
+    "db/textures/textures_trees.xdb1": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\textures\textures_trees.xdb1"),
+    "db/textures/textures_trees.xdb3": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\textures\textures_trees.xdb3"),
 }
 DB_EXCLUDED_REL_PATHS = {
     "db/mods/00_modded_exes_gamedata.db0",
@@ -39,7 +42,11 @@ LAUNCHER_REPO = "sysliveprime-ctrl/AnthologyLauncher"
 DB_REPO = "sysliveprime-ctrl/anthology-db"
 SOURCE_REPO = "sysliveprime-ctrl/anthology-source"
 LAUNCHER_ASSET = "AnomalyLauncher.exe"
-MODPACK_ALLOWED_PARTS = {"configs", "scripts"}
+MODPACK_ALLOWED_PARTS = {"configs", "scripts", "textures"}
+MODPACK_MANAGED_FULL_FOLDER_NAMES = {
+    "[WPN][100][SPL][R.A.K. Weapon Pack Adaptation Global Simple Patch]",
+}
+MODPACK_MANAGED_FULL_FOLDERS = {name.casefold() for name in MODPACK_MANAGED_FULL_FOLDER_NAMES}
 MODPACK_PRESERVE_MARKERS = (
     "r.a.k weapon pack adaptation",
 )
@@ -82,6 +89,25 @@ def commit_push(root: Path, message: str, dry_run: bool) -> str:
     run(["git", "add", "-A"], cwd=root)
     if short_status(root):
         run(["git", "commit", "-m", message], cwd=root)
+    else:
+        print("No git changes to commit.")
+    run(["git", "push", "origin", "main"], cwd=root)
+    return run(["git", "rev-parse", "--short", "HEAD"], cwd=root, capture=True).strip()
+
+
+def commit_push_paths(root: Path, paths: list[Path], message: str, dry_run: bool) -> str:
+    print(status(root))
+    if dry_run:
+        print("DRY RUN: skip git add/commit/push")
+        return run(["git", "rev-parse", "--short", "HEAD"], cwd=root, capture=True).strip()
+
+    run(["git", "add", "--", *[path.relative_to(root) if path.is_absolute() else path for path in paths]], cwd=root)
+    if short_status(root):
+        staged = run(["git", "diff", "--cached", "--name-only"], cwd=root, capture=True).strip()
+        if staged:
+            run(["git", "commit", "-m", message], cwd=root)
+        else:
+            print("No staged git changes to commit.")
     else:
         print("No git changes to commit.")
     run(["git", "push", "origin", "main"], cwd=root)
@@ -369,6 +395,8 @@ def is_modpack_update_path(path: str) -> bool:
     parts = candidate.parts
     if not parts or any(part in ("", ".", "..") for part in parts):
         return False
+    if parts[0].casefold() in MODPACK_MANAGED_FULL_FOLDERS:
+        return True
     lowered = [part.lower() for part in parts]
     if "gamedata" not in lowered:
         return False
@@ -377,12 +405,17 @@ def is_modpack_update_path(path: str) -> bool:
 
 
 def should_preserve_modpack_path(path: str) -> bool:
+    parts = Path(path.replace("\\", "/")).parts
+    if parts and parts[0].casefold() in MODPACK_MANAGED_FULL_FOLDERS:
+        return False
     normalized = Path(path.replace("\\", "/")).as_posix().casefold()
     return any(marker in normalized for marker in MODPACK_PRESERVE_MARKERS)
 
 
 def deleted_modpack_files(root: Path) -> list[str]:
     deleted = set()
+    pathspecs = [f":(glob)**/gamedata/{part}/**" for part in sorted(MODPACK_ALLOWED_PARTS)]
+    pathspecs.extend(f":(glob){folder}/**" for folder in sorted(MODPACK_MANAGED_FULL_FOLDER_NAMES))
     output = run(
         [
             "git",
@@ -393,8 +426,7 @@ def deleted_modpack_files(root: Path) -> list[str]:
             "--name-only",
             "--pretty=format:",
             "--",
-            ":(glob)**/gamedata/configs/**",
-            ":(glob)**/gamedata/scripts/**",
+            *pathspecs,
         ],
         cwd=root,
         capture=True,
@@ -415,8 +447,7 @@ def deleted_modpack_files(root: Path) -> list[str]:
             "-z",
             "--short",
             "--",
-            ":(glob)**/gamedata/configs/**",
-            ":(glob)**/gamedata/scripts/**",
+            *pathspecs,
         ],
         cwd=root,
         capture=True,
@@ -662,7 +693,7 @@ def command_db(args: argparse.Namespace) -> None:
     data["files"] = files
     write_json(meta, data)
 
-    commit = commit_push(root, args.message or f"Bump Anthology Work Git to {version}", args.dry_run)
+    commit = commit_push_paths(root, [meta], args.message or f"Bump Anthology Work Git to {version}", args.dry_run)
 
     uploaded = []
     if args.manifest_only or args.dry_run:

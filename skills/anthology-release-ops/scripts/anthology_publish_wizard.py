@@ -38,6 +38,9 @@ DB_SOURCE_DIRS = {
 }
 DB_SOURCE_FILES = {
     "db/shaders_anthology.xdb0": LIVE_GAME_DIR / "db" / "shaders_anthology.xdb0",
+    "db/textures/textures_trees.xdb0": LIVE_GAME_DIR / "db" / "textures" / "textures_trees.xdb0",
+    "db/textures/textures_trees.xdb1": LIVE_GAME_DIR / "db" / "textures" / "textures_trees.xdb1",
+    "db/textures/textures_trees.xdb3": LIVE_GAME_DIR / "db" / "textures" / "textures_trees.xdb3",
 }
 DB_EXCLUDED_REL_PATHS = {
     "db/mods/00_modded_exes_gamedata.db0",

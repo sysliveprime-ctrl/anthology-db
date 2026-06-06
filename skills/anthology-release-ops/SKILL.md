@@ -26,6 +26,9 @@ DB manifest repo:   E:\dev\Anthology-Work-Git
 DB asset sources:   D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs
                     D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods
                     D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0
+                    D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\textures\textures_trees.xdb0
+                    D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\textures\textures_trees.xdb1
+                    D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\textures\textures_trees.xdb3
 ```
 
 Primary helper:
@@ -68,7 +71,7 @@ Players do not need Git. Git is only our publishing transport.
   channel. The launcher preserves it during DB cleanup.
 - Modpack stores installed file paths in `.launcher_update_state.json`.
 - Modpack updater now removes previously tracked files when they disappear from
-  the new `main.zip`.
+  the new `main.zip`, then prunes empty folders left by those removals.
 - Modpack `version.json` may include `removed_files`. These are explicit
   repo-relative cleanup paths generated from Git history during release; players
   do not need Git for this cleanup.
@@ -120,8 +123,8 @@ py -3 E:\dev\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_r
 Does:
 
 - updates `version.json`
-- auto-fills `removed_files` with deleted tracked `gamedata/configs` and
-  `gamedata/scripts` files that are absent from current Git
+- auto-fills `removed_files` with deleted tracked `gamedata/configs`,
+  `gamedata/scripts`, and `gamedata/textures` files that are absent from current Git
 - commits tracked modpack changes
 - pushes `sysliveprime-ctrl/anthology-mo2-modpack` `main`
 
