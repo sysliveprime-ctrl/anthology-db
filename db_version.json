@@ -1,7 +1,7 @@
 {
-  "version": "2026.06.05.1",
+  "version": "2026.06.06.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.05.1/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.06.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -42,8 +42,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1383887,
-      "sha256": "55dc9bc2bdb8655f2c0ab5bb9b3e63a0b57e066040ae44f0524e5032ff83307d"
+      "size": 1384012,
+      "sha256": "f21c47ea37321901e84431699fd627e95accdfa723fcda9ee74f30151c3501a4"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -162,8 +162,26 @@
     {
       "path": "db/shaders_anthology.xdb0",
       "asset_name": "db_shaders_anthology.xdb0",
-      "size": 6449926,
-      "sha256": "75c52c0f031beef8c17f94562cdf18398bbba65b9a707a23f7f9d31e6e884d9a"
+      "size": 2577258,
+      "sha256": "7d170bcba3d4503308b1e7b6d893a9a7e4eff53ec117a562d39308c288876b85"
+    },
+    {
+      "path": "db/textures/textures_trees.xdb0",
+      "asset_name": "db_textures_textures_trees.xdb0",
+      "size": 60368387,
+      "sha256": "fec0ef05dd1cada55abe25560120fa9c162a95585ae5c8aa3e1872cfe61620bf"
+    },
+    {
+      "path": "db/textures/textures_trees.xdb1",
+      "asset_name": "db_textures_textures_trees.xdb1",
+      "size": 210089690,
+      "sha256": "0ce5ac1e9a69430b7883bd132552a624ad1e34e8a5ea69e110d08897b010ee3f"
+    },
+    {
+      "path": "db/textures/textures_trees.xdb3",
+      "asset_name": "db_textures_textures_trees.xdb3",
+      "size": 52031111,
+      "sha256": "ee9ff717d5413e5b7ae8459a4d3e6724c3257429ede110206bf8f07416cf669a"
     }
   ],
   "notes": "Обновление DB Anthology."
