@@ -1,7 +1,7 @@
 {
-  "version": "2026.06.06.2",
+  "version": "2026.06.07.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.06.2/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.07.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -42,8 +42,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1385344,
-      "sha256": "961b1facb540cd9aa0bd3d8a278ba8435141909cc4f5bb2d67c658fd435e47b8"
+      "size": 1385409,
+      "sha256": "4ad4e60a706514b34de83e3d2f9e473a32bbe1af94eeafa8a10455d1e5857063"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -166,6 +166,12 @@
       "sha256": "7d170bcba3d4503308b1e7b6d893a9a7e4eff53ec117a562d39308c288876b85"
     },
     {
+      "path": "db/textures/textures_actors_gnra.xdb0",
+      "asset_name": "db_textures_textures_actors_gnra.xdb0",
+      "size": 633446432,
+      "sha256": "5ff051fac2ecc17303e1ab3bdd91e93b630bda61718c70b2b0bb413e83596f9b"
+    },
+    {
       "path": "db/textures/textures_trees.xdb0",
       "asset_name": "db_textures_textures_trees.xdb0",
       "size": 60368387,
@@ -184,5 +190,8 @@
       "sha256": "ee9ff717d5413e5b7ae8459a4d3e6724c3257429ede110206bf8f07416cf669a"
     }
   ],
-  "notes": "Обновление DB Anthology."
+  "notes": "Обновление DB Anthology.",
+  "removed_files": [
+    "db/textures/textures_actors_gnra.xdb1"
+  ]
 }
