@@ -1,7 +1,7 @@
 {
-  "version": "2026.06.13.2",
+  "version": "2026.06.14.3",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.13.2/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.14.3/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -20,8 +20,8 @@
     {
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
-      "size": 13172993,
-      "sha256": "e79286f85736ade35f7e862eb9d617b8247fae17c2a94838d09ea9f2b1460ea6"
+      "size": 12920554,
+      "sha256": "34c24d6eb9e14308a3755a74ac5b54df1c76d18102e98f5d6de768ddccb3b1fc"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -47,9 +47,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1382049,
-      "sha256": "ea8ce8ed61710f178af8b9bd794d2bbd600ffb397a23a8ff04e92e4b2a3bc8a0",
-      "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.13.1/db_configs_scripts_anthology.xdb0"
+      "size": 1382435,
+      "sha256": "6a271a1af134e79787b5c52a4856f84602d02a54979c6836ad869df8b91222f0"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -220,7 +219,7 @@
       "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.07.1/db_textures_textures_trees.xdb3"
     }
   ],
-  "notes": "Обновление DB Anthology. v3",
+  "notes": "Обновление DB Anthology. V3 (ПОЧИНЕН ДОКТОР)",
   "removed_files": [
     "db/textures/textures_actors_gnra.xdb1"
   ]
