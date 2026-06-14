@@ -1,7 +1,7 @@
 {
-  "version": "2026.06.14.1",
+  "version": "2026.06.14.3",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.14.1/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.14.3/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -21,7 +21,8 @@
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
       "size": 12885792,
-      "sha256": "da6279ee8d0f7cf5a449385c2fa444ae8ce9bad915501adc3ca5cf1834fd510a"
+      "sha256": "da6279ee8d0f7cf5a449385c2fa444ae8ce9bad915501adc3ca5cf1834fd510a",
+      "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.14.1/db_configs_configs_anthology.xdb0"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -180,9 +181,8 @@
     {
       "path": "db/mods/zhopa.xdb0",
       "asset_name": "db_mods_zhopa.xdb0",
-      "size": 228753,
-      "sha256": "be557b4316b7aac09d00e24b10a71ca1b9a4908ce1a78757bd39a6b4be20e952",
-      "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.07.1/db_mods_zhopa.xdb0"
+      "size": 251,
+      "sha256": "a5d3fe0a84f436d1f313d8812de8bb808b422877fca63988a5afe16c6e0667e0"
     },
     {
       "path": "db/shaders_anthology.xdb0",
@@ -220,7 +220,7 @@
       "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.07.1/db_textures_textures_trees.xdb3"
     }
   ],
-  "notes": "Временно удалена жопа (удаляла Султана)",
+  "notes": "Удаление мод ASS дубль два",
   "removed_files": [
     "db/mods/zhopa.xdb0",
     "db/textures/textures_actors_gnra.xdb1"
