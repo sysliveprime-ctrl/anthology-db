@@ -1,7 +1,7 @@
 {
-  "version": "2026.06.14.3",
+  "version": "2026.06.22.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.14.3/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.22.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -20,9 +20,8 @@
     {
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
-      "size": 12885792,
-      "sha256": "da6279ee8d0f7cf5a449385c2fa444ae8ce9bad915501adc3ca5cf1834fd510a",
-      "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.14.1/db_configs_configs_anthology.xdb0"
+      "size": 12919521,
+      "sha256": "26f69cf1a4ea000c5fd4b7f7cd97d314906b069ea58c49c7fdd53a4742409992"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -48,9 +47,8 @@
     {
       "path": "db/configs/scripts_anthology.xdb0",
       "asset_name": "db_configs_scripts_anthology.xdb0",
-      "size": 1382435,
-      "sha256": "6a271a1af134e79787b5c52a4856f84602d02a54979c6836ad869df8b91222f0",
-      "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.14.3/db_configs_scripts_anthology.xdb0"
+      "size": 1383305,
+      "sha256": "83d293e36e93702c31018a2d46f513c27ce51257cc69fd09a285e505a450ba65"
     },
     {
       "path": "db/configs/scripts_smart_covers_cs.xdb0",
@@ -182,7 +180,8 @@
       "path": "db/mods/zhopa.xdb0",
       "asset_name": "db_mods_zhopa.xdb0",
       "size": 251,
-      "sha256": "a5d3fe0a84f436d1f313d8812de8bb808b422877fca63988a5afe16c6e0667e0"
+      "sha256": "a5d3fe0a84f436d1f313d8812de8bb808b422877fca63988a5afe16c6e0667e0",
+      "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.14.3/db_mods_zhopa.xdb0"
     },
     {
       "path": "db/shaders_anthology.xdb0",
@@ -220,7 +219,7 @@
       "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.07.1/db_textures_textures_trees.xdb3"
     }
   ],
-  "notes": "Удаление мод ASS дубль два",
+  "notes": "Обновление DB Anthology.",
   "removed_files": [
     "db/mods/zhopa.xdb0",
     "db/textures/textures_actors_gnra.xdb1"
