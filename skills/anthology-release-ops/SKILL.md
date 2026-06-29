@@ -134,6 +134,22 @@ After publishing, verify modpack `version.json` through the GitHub contents API,
 not raw GitHub. Raw can return the previous version for a while and make it look
 like the push failed.
 
+### Separate mod/fix folder package
+
+Use the Release Control GUI button `Опубликовать мод/фикс`, or run:
+
+```powershell
+py -3 skills/anthology-release-ops/scripts/anthology_release_ops.py modpack-folder --folder "<top-level mods folder>" --mode standard --version YYYY.MM.DD.N --notes "..."
+```
+
+- `standard` packages only `gamedata/configs`, `gamedata/scripts`, and `gamedata/textures`.
+- `full` packages the complete selected top-level mod folder.
+- The command creates a dedicated ZIP Release asset and records it under `folder_packages` in `version.json`.
+- Only the selected folder and `version.json` are staged for commit; unrelated working-tree changes stay unstaged.
+- Publishing is refused unless local `main` exactly matches `origin/main` and no unrelated staged changes exist.
+- The launcher tracks each folder package independently, verifies size and SHA-256, installs only declared paths, and removes stale declared files.
+- Publish a launcher build containing folder-package support before relying on this channel for players.
+
 Preview cleanup list without publishing:
 
 ```powershell
@@ -213,6 +229,14 @@ Rules:
 
 - Do not store DB archives under `E:\dev\Anthology-Work-Git\db`.
 - GitHub rejects zero-byte release assets; use at least 1 byte for test assets.
+- DB publishing must stop when a configured source path is missing.
+- A previously published DB path may disappear only when it is explicitly listed
+  in `removed_files`; this guards mirror mode against a wrong drive/path deleting
+  unrelated archives from player installations.
+- A path must never appear in both `files` and `removed_files`.
+- The launcher stages and verifies every DB download before cleanup, and moves
+  replaced/removed archives into `webcache/db_update/backups` instead of deleting
+  them permanently. It keeps the three newest DB backups.
 - If upload fails after commit/push, stop and say which asset/phase failed.
 - After cleanup, verify GitHub contents API, not only raw GitHub URL.
 

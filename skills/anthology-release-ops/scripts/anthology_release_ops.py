@@ -13,42 +13,94 @@ import subprocess
 import sys
 import tempfile
 import time
+import zipfile
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
-WORKGIT_DIR = Path(r"E:\dev\Anthology-Work-Git")
+WORKGIT_DIR = Path(
+    os.environ.get("ANTHOLOGY_WORKGIT_DIR", str(Path(__file__).resolve().parents[3]))
+)
+GAME_ROOT = Path(
+    os.environ.get(
+        "ANTHOLOGY_GAME_ROOT",
+        r"X:\S.T.A.L.K.E.R\A.N.T.H.O.L.O.G.Y\ANTHOLOGY",
+    )
+)
 LAUNCHER_DIR = WORKGIT_DIR / "projects" / "AnthologyLauncher"
-MODPACK_DIR = Path(r"D:\Games\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods")
-SOURCE_DIR = Path(r"E:\dev\anomaly-codex-main\ai_workspace\Source_Anthology")
+MODPACK_DIR = Path(
+    os.environ.get(
+        "ANTHOLOGY_MODPACK_DIR",
+        str(GAME_ROOT / "SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT" / "mods"),
+    )
+)
+SOURCE_DIR = Path(
+    os.environ.get(
+        "ANTHOLOGY_SOURCE_DIR",
+        str(WORKGIT_DIR.parent.parent / "ai_workspace" / "Source_Anthology"),
+    )
+)
+LIVE_GAME_DIR = Path(
+    os.environ.get(
+        "ANTHOLOGY_LIVE_GAME_DIR",
+        str(GAME_ROOT / "Anomaly-1.5.3-Anthology 2.1"),
+    )
+)
 DB_DIR = WORKGIT_DIR
+UPDATE_RULES_FILE = LAUNCHER_DIR / "assets" / "update_rules.json"
+
+
+def read_update_rules() -> dict:
+    if not UPDATE_RULES_FILE.exists():
+        return {}
+    return json.loads(UPDATE_RULES_FILE.read_text(encoding="utf-8-sig"))
+
+
+UPDATE_RULES = read_update_rules()
+DB_RULES = UPDATE_RULES.get("db", {})
+MO2_RULES = UPDATE_RULES.get("mo2", {})
 DB_SOURCE_DIRS = {
-    "configs": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs"),
-    "mods": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods"),
+    "configs": LIVE_GAME_DIR / "db" / "configs",
+    "mods": LIVE_GAME_DIR / "db" / "mods",
 }
+DB_SOURCE_DIRS.update({key: Path(value) for key, value in DB_RULES.get("source_dirs", {}).items()})
 DB_SOURCE_FILES = {
-    "db/shaders_anthology.xdb0": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0"),
-    "db/textures/textures_trees.xdb0": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\textures\textures_trees.xdb0"),
-    "db/textures/textures_trees.xdb1": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\textures\textures_trees.xdb1"),
-    "db/textures/textures_trees.xdb3": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\textures\textures_trees.xdb3"),
+    "db/shaders_anthology.xdb0": LIVE_GAME_DIR / "db" / "shaders_anthology.xdb0",
+    "db/textures/textures_trees.xdb0": LIVE_GAME_DIR / "db" / "textures" / "textures_trees.xdb0",
+    "db/textures/textures_trees.xdb1": LIVE_GAME_DIR / "db" / "textures" / "textures_trees.xdb1",
+    "db/textures/textures_trees.xdb3": LIVE_GAME_DIR / "db" / "textures" / "textures_trees.xdb3",
 }
+DB_SOURCE_FILES.update({key: Path(value) for key, value in DB_RULES.get("source_files", {}).items()})
 DB_EXCLUDED_REL_PATHS = {
     "db/mods/00_modded_exes_gamedata.db0",
 }
+DB_EXCLUDED_REL_PATHS.update(path.casefold() for path in DB_RULES.get("excluded_rel_paths", []))
+DB_REMOVED_REL_PATHS = {
+    str(path).replace("\\", "/").casefold()
+    for path in DB_RULES.get("removed_files", [])
+}
 
 LAUNCHER_REPO = "sysliveprime-ctrl/AnthologyLauncher"
+MODPACK_REPO = "sysliveprime-ctrl/anthology-mo2-modpack"
 DB_REPO = "sysliveprime-ctrl/anthology-db"
 SOURCE_REPO = "sysliveprime-ctrl/anthology-source"
 LAUNCHER_ASSET = "AnomalyLauncher.exe"
-MODPACK_ALLOWED_PARTS = {"configs", "scripts", "textures"}
-MODPACK_MANAGED_FULL_FOLDER_NAMES = {
+MODPACK_ALLOWED_PARTS = set(MO2_RULES.get("allowed_parts", ["configs", "scripts", "textures"]))
+MODPACK_MANAGED_STANDARD_FOLDER_NAMES = set(MO2_RULES.get("managed_standard_folders", []))
+MODPACK_MANAGED_FULL_FOLDER_NAMES = set(MO2_RULES.get("managed_full_folders", [
     "[WPN][100][SPL][R.A.K. Weapon Pack Adaptation Global Simple Patch]",
-}
+]))
+MODPACK_MANAGED_STANDARD_FOLDERS = {name.casefold() for name in MODPACK_MANAGED_STANDARD_FOLDER_NAMES}
 MODPACK_MANAGED_FULL_FOLDERS = {name.casefold() for name in MODPACK_MANAGED_FULL_FOLDER_NAMES}
+MODPACK_MANAGED_FOLDERS = MODPACK_MANAGED_STANDARD_FOLDERS | MODPACK_MANAGED_FULL_FOLDERS
 MODPACK_PRESERVE_MARKERS = (
     "r.a.k weapon pack adaptation",
+)
+MODPACK_REMOVED_EXCLUDE_MARKERS = (
+    "anthology_release_",
+    ".codex_backup_",
 )
 
 
@@ -406,16 +458,22 @@ def is_modpack_update_path(path: str) -> bool:
 
 def should_preserve_modpack_path(path: str) -> bool:
     parts = Path(path.replace("\\", "/")).parts
-    if parts and parts[0].casefold() in MODPACK_MANAGED_FULL_FOLDERS:
+    if parts and parts[0].casefold() in MODPACK_MANAGED_FOLDERS:
         return False
     normalized = Path(path.replace("\\", "/")).as_posix().casefold()
     return any(marker in normalized for marker in MODPACK_PRESERVE_MARKERS)
 
 
+def should_exclude_removed_modpack_path(path: str) -> bool:
+    normalized = Path(path.replace("\\", "/")).as_posix().casefold()
+    return any(marker in normalized for marker in MODPACK_REMOVED_EXCLUDE_MARKERS)
+
+
 def deleted_modpack_files(root: Path) -> list[str]:
     deleted = set()
     pathspecs = [f":(glob)**/gamedata/{part}/**" for part in sorted(MODPACK_ALLOWED_PARTS)]
-    pathspecs.extend(f":(glob){folder}/**" for folder in sorted(MODPACK_MANAGED_FULL_FOLDER_NAMES))
+    pathspecs.extend(f":(literal){folder}" for folder in sorted(MODPACK_MANAGED_FULL_FOLDER_NAMES))
+    pathspecs.extend(f":(literal){folder}/gamedata/{part}" for folder in sorted(MODPACK_MANAGED_STANDARD_FOLDER_NAMES) for part in sorted(MODPACK_ALLOWED_PARTS))
     output = run(
         [
             "git",
@@ -433,7 +491,12 @@ def deleted_modpack_files(root: Path) -> list[str]:
     )
     for line in output.splitlines():
         rel = line.strip().replace("\\", "/")
-        if not rel or not is_modpack_update_path(rel) or should_preserve_modpack_path(rel):
+        if (
+            not rel
+            or not is_modpack_update_path(rel)
+            or should_preserve_modpack_path(rel)
+            or should_exclude_removed_modpack_path(rel)
+        ):
             continue
         if not (root / rel).exists():
             deleted.add(Path(rel).as_posix())
@@ -458,7 +521,12 @@ def deleted_modpack_files(root: Path) -> list[str]:
         if not entry.startswith(" D ") and not entry.startswith("D  "):
             continue
         rel = entry[3:].strip().replace("\\", "/")
-        if rel and is_modpack_update_path(rel) and not should_preserve_modpack_path(rel):
+        if (
+            rel
+            and is_modpack_update_path(rel)
+            and not should_preserve_modpack_path(rel)
+            and not should_exclude_removed_modpack_path(rel)
+        ):
             deleted.add(Path(rel).as_posix())
 
     return sorted(deleted, key=str.casefold)
@@ -632,6 +700,177 @@ def command_modpack_removed(args: argparse.Namespace) -> None:
     ))
 
 
+def folder_package_id(folder: str) -> str:
+    normalized = Path(folder).as_posix().strip("/")
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized.casefold()).strip("-")[:40] or "folder"
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:10]
+    return f"{slug}-{digest}"
+
+
+def validate_folder_package_version(version: str) -> str:
+    value = version.strip()
+    if not value or not re.fullmatch(r"[0-9A-Za-z._-]+", value):
+        raise ReleaseError("Folder package version may contain only letters, digits, '.', '_' and '-'.")
+    return value
+
+
+def selected_modpack_folder(root: Path, value: str) -> tuple[Path, Path]:
+    selected = Path(value).expanduser().resolve()
+    root_resolved = root.resolve()
+    try:
+        relative = selected.relative_to(root_resolved)
+    except ValueError as exc:
+        raise ReleaseError(f"Selected folder must be inside the MO2 mods repository: {root_resolved}") from exc
+    if len(relative.parts) != 1 or not selected.is_dir():
+        raise ReleaseError("Select one top-level mod folder directly inside MO2 mods.")
+    return selected, relative
+
+
+def folder_package_paths(root: Path, folder: Path, relative: Path, mode: str) -> list[tuple[Path, str]]:
+    candidates: list[Path] = []
+    if mode == "full":
+        candidates = [path for path in folder.rglob("*") if path.is_file()]
+    else:
+        for part in sorted(MODPACK_ALLOWED_PARTS):
+            base = folder / "gamedata" / part
+            if base.exists():
+                candidates.extend(path for path in base.rglob("*") if path.is_file())
+
+    files: list[tuple[Path, str]] = []
+    for path in candidates:
+        rel = path.relative_to(root).as_posix()
+        parts = Path(rel).parts
+        if any(part in {".git", ".github", ".vscode", "__pycache__"} for part in parts):
+            continue
+        if any(marker in rel.casefold() for marker in MODPACK_REMOVED_EXCLUDE_MARKERS):
+            continue
+        files.append((path, rel))
+    files.sort(key=lambda item: item[1].casefold())
+    if not files:
+        scope = "all files" if mode == "full" else "gamedata/configs, scripts or textures"
+        raise ReleaseError(f"Selected folder contains no package files in scope: {scope}")
+    return files
+
+
+def build_folder_package_zip(package_id: str, version: str, files: list[tuple[Path, str]]) -> tuple[Path, str]:
+    asset_name = f"anthology-folder-{package_id}-{version}.zip"
+    output_dir = Path(tempfile.gettempdir()) / "anthology-folder-packages"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = output_dir / asset_name
+    zip_path.unlink(missing_ok=True)
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for source, relative in files:
+            archive.write(source, relative)
+    return zip_path, asset_name
+
+
+def folder_package_entries(data: dict) -> list[dict]:
+    raw = data.get("folder_packages", [])
+    if raw in (None, ""):
+        return []
+    if not isinstance(raw, list) or any(not isinstance(item, dict) for item in raw):
+        raise ReleaseError("version.json folder_packages must be a list of objects.")
+    return list(raw)
+
+
+def ensure_folder_package_git_ready(root: Path, meta: Path, dry_run: bool) -> None:
+    branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=root, capture=True).strip()
+    if branch != "main":
+        raise ReleaseError(f"Folder package publishing requires branch main, current branch: {branch}")
+    staged = run(["git", "diff", "--cached", "--name-only"], cwd=root, capture=True).strip()
+    if staged:
+        raise ReleaseError("Unrelated staged changes exist. Commit or unstage them before folder package publishing.")
+    meta_status = run(["git", "status", "--porcelain=v1", "--", meta.name], cwd=root, capture=True).strip()
+    if meta_status:
+        raise ReleaseError(f"{meta.name} already has local changes; resolve them before publishing a folder package.")
+    if dry_run:
+        print("DRY RUN: skip remote synchronization gate")
+        return
+    run(["git", "fetch", "origin", "main", "--prune"], cwd=root)
+    counts = run(["git", "rev-list", "--left-right", "--count", "HEAD...origin/main"], cwd=root, capture=True).strip().split()
+    if len(counts) != 2 or counts != ["0", "0"]:
+        ahead = counts[0] if counts else "?"
+        behind = counts[1] if len(counts) > 1 else "?"
+        raise ReleaseError(f"Local main must match origin/main before publishing (ahead={ahead}, behind={behind}).")
+
+
+def command_modpack_folder(args: argparse.Namespace) -> None:
+    root = Path(args.path or MODPACK_DIR)
+    meta = root / "version.json"
+    version = validate_folder_package_version(args.version or default_version())
+    notes = args.notes or "Отдельное обновление мода/фикса."
+    mode = args.mode or "standard"
+    folder, relative = selected_modpack_folder(root, args.folder)
+    package_id = folder_package_id(relative.as_posix())
+    files = folder_package_paths(root, folder, relative, mode)
+    current_paths = [rel for _source, rel in files]
+
+    data = read_json(meta)
+    entries = folder_package_entries(data)
+    previous = next((item for item in entries if str(item.get("id", "")) == package_id), None)
+    if previous and str(previous.get("version", "")).strip() == version:
+        raise ReleaseError(f"Folder package {relative} already uses version {version}; choose a new version.")
+    previous_files = {
+        Path(str(item).replace("\\", "/")).as_posix()
+        for item in (previous or {}).get("files", [])
+        if isinstance(item, str)
+    }
+    removed_files = sorted(previous_files - set(current_paths), key=str.casefold)
+    zip_path, asset_name = build_folder_package_zip(package_id, version, files)
+    digest = sha256_file(zip_path)
+    tag = f"folder-{package_id}-{version}"
+    url = f"https://github.com/{MODPACK_REPO}/releases/download/{tag}/{asset_name}"
+    entry = {
+        "id": package_id,
+        "folder": relative.as_posix(),
+        "mode": mode,
+        "version": version,
+        "notes": notes,
+        "url": url,
+        "asset_name": asset_name,
+        "size": zip_path.stat().st_size,
+        "sha256": digest,
+        "files": current_paths,
+        "removed_files": removed_files,
+    }
+
+    ensure_folder_package_git_ready(root, meta, args.dry_run)
+    if args.dry_run:
+        print(json.dumps({"type": "modpack-folder", "dry_run": True, "package": entry, "zip": str(zip_path)}, ensure_ascii=False, indent=2))
+        return
+
+    token = github_token()
+    release = release_by_tag(MODPACK_REPO, tag, token) or create_release(MODPACK_REPO, tag, token, notes)
+    asset = upload_asset(release, zip_path, asset_name, token)
+
+    entries = [item for item in entries if str(item.get("id", "")) != package_id]
+    entries.append(entry)
+    entries.sort(key=lambda item: str(item.get("folder", "")).casefold())
+    data["folder_packages"] = entries
+    write_json(meta, data)
+    commit = commit_push_paths(
+        root,
+        [folder, meta],
+        args.message or f"Publish folder package {relative.as_posix()} {version}",
+        False,
+    )
+    print(json.dumps(
+        {
+            "type": "modpack-folder",
+            "version": version,
+            "folder": relative.as_posix(),
+            "mode": mode,
+            "commit": commit,
+            "asset": asset.get("name"),
+            "asset_size": asset.get("size"),
+            "file_count": len(current_paths),
+            "removed_files": len(removed_files),
+        },
+        ensure_ascii=False,
+        indent=2,
+    ))
+
+
 def command_source(args: argparse.Namespace) -> None:
     root = Path(args.path or SOURCE_DIR)
     version = args.version or default_version()
@@ -643,21 +882,53 @@ def command_source(args: argparse.Namespace) -> None:
 
 
 def db_asset_paths() -> list[tuple[Path, str]]:
-    paths: list[tuple[Path, str]] = []
+    missing_sources: list[str] = []
+    paths: dict[str, tuple[Path, str]] = {}
     for folder, base in DB_SOURCE_DIRS.items():
-        if not base.exists():
+        if not base.is_dir():
+            missing_sources.append(f"db/{folder}: {base}")
             continue
         for path in base.rglob("*"):
             if path.is_file():
                 rel = Path("db") / folder / path.relative_to(base)
                 rel_posix = rel.as_posix()
-                if rel_posix.casefold() in DB_EXCLUDED_REL_PATHS:
+                key = rel_posix.casefold()
+                if key in DB_EXCLUDED_REL_PATHS or key in DB_REMOVED_REL_PATHS:
                     continue
-                paths.append((path, rel_posix))
+                paths[key] = (path, rel_posix)
     for rel, path in DB_SOURCE_FILES.items():
-        if path.exists() and rel.casefold() not in DB_EXCLUDED_REL_PATHS:
-            paths.append((path, rel))
-    return sorted(paths, key=lambda item: item[1].casefold())
+        key = rel.casefold()
+        if key in DB_EXCLUDED_REL_PATHS or key in DB_REMOVED_REL_PATHS:
+            continue
+        if not path.is_file():
+            missing_sources.append(f"{rel}: {path}")
+            continue
+        paths[key] = (path, rel)
+    if missing_sources:
+        details = "\n".join(f"  - {item}" for item in missing_sources)
+        raise ReleaseError(
+            "DB publishing stopped because configured source paths are missing. "
+            "Fix assets/update_rules.json before publishing:\n" + details
+        )
+    return sorted(paths.values(), key=lambda item: item[1].casefold())
+
+
+def validate_db_manifest_transition(old_entries: dict[str, dict], files: list[dict]) -> None:
+    new_paths = {str(entry.get("path", "")).replace("\\", "/").casefold() for entry in files}
+    old_paths = {str(path).replace("\\", "/").casefold() for path in old_entries}
+    overlap = sorted(new_paths & DB_REMOVED_REL_PATHS)
+    if overlap:
+        details = "\n".join(f"  - {path}" for path in overlap)
+        raise ReleaseError("DB paths cannot be published and removed in the same manifest:\n" + details)
+    unexpected = sorted(old_paths - new_paths - DB_REMOVED_REL_PATHS)
+    if unexpected:
+        details = "\n".join(f"  - {path}" for path in unexpected)
+        raise ReleaseError(
+            "DB publishing stopped: previously published files disappeared without an explicit "
+            "removed_files rule. This usually means a source path is wrong:\n" + details
+        )
+    if not files:
+        raise ReleaseError("DB publishing stopped: the generated manifest has no files.")
 
 
 def db_asset_name(rel_path: str) -> str:
@@ -666,32 +937,75 @@ def db_asset_name(rel_path: str) -> str:
     return name
 
 
+def db_entry_asset_url(manifest: dict, entry: dict, target_version: str) -> str:
+    explicit = str(entry.get("url", "")).strip()
+    if explicit:
+        return explicit
+    if str(manifest.get("version", "")).strip() == target_version:
+        return ""
+    base_url = str(manifest.get("base_url", "")).strip()
+    asset_name = str(entry.get("asset_name") or db_asset_name(entry["path"])).strip()
+    if not base_url:
+        return ""
+    return base_url.rstrip("/") + "/" + quote(asset_name.replace("\\", "/"), safe="/")
+
+
+def unchanged_db_entry(current: dict, previous: dict | None) -> bool:
+    if not previous:
+        return False
+    return (
+        current.get("size") == previous.get("size")
+        and str(current.get("sha256", "")).casefold() == str(previous.get("sha256", "")).casefold()
+        and current.get("asset_name") == previous.get("asset_name")
+    )
+
+
 def command_db(args: argparse.Namespace) -> None:
     root = Path(args.path or DB_DIR)
     version = args.version or default_version()
     notes = args.notes or "Anthology Work Git update."
     meta = root / "db_version.json"
 
+    old_data = read_json(meta)
+    old_entries = {entry.get("path"): entry for entry in old_data.get("files", []) if isinstance(entry, dict)}
     files = []
     asset_sources: dict[str, Path] = {}
+    upload_entries: list[dict] = []
     for path, rel in db_asset_paths():
         asset_sources[rel] = path
-        files.append(
-            {
-                "path": rel,
-                "asset_name": db_asset_name(rel),
-                "size": path.stat().st_size,
-                "sha256": sha256_file(path),
-            }
-        )
+        entry = {
+            "path": rel,
+            "asset_name": db_asset_name(rel),
+            "size": path.stat().st_size,
+            "sha256": sha256_file(path),
+        }
+        old_entry = old_entries.get(rel)
+        if unchanged_db_entry(entry, old_entry):
+            old_url = db_entry_asset_url(old_data, old_entry, version)
+            if old_url:
+                entry["url"] = old_url
+            else:
+                upload_entries.append(entry)
+        else:
+            upload_entries.append(entry)
+        files.append(entry)
 
-    data = read_json(meta)
+    validate_db_manifest_transition(old_entries, files)
+
+    data = old_data
     data["version"] = version
     data["mode"] = "mirror"
     data["base_url"] = f"https://github.com/{DB_REPO}/releases/download/{version}/"
     data["notes"] = notes
     data["files"] = files
-    write_json(meta, data)
+    data["removed_files"] = sorted(
+        {str(path).replace("\\", "/") for path in DB_RULES.get("removed_files", [])},
+        key=str.casefold,
+    )
+    if args.dry_run:
+        print(f"DRY RUN: skip writing {meta}")
+    else:
+        write_json(meta, data)
 
     commit = commit_push_paths(root, [meta], args.message or f"Bump Anthology Work Git to {version}", args.dry_run)
 
@@ -701,12 +1015,12 @@ def command_db(args: argparse.Namespace) -> None:
     else:
         token = github_token()
         release = release_by_tag(DB_REPO, version, token) or create_release(DB_REPO, version, token, notes)
-        for entry in files:
+        for entry in upload_entries:
             asset = upload_asset(release, asset_sources[entry["path"]], entry["asset_name"], token)
             uploaded.append({"name": asset.get("name"), "size": asset.get("size")})
 
     print(json.dumps(
-        {"type": "workgit", "version": version, "commit": commit, "assets": uploaded, "file_count": len(files)},
+        {"type": "workgit", "version": version, "commit": commit, "assets": uploaded, "file_count": len(files), "reused_assets": len(files) - len(upload_entries)},
         ensure_ascii=False,
         indent=2,
     ))
@@ -780,6 +1094,12 @@ def build_parser() -> argparse.ArgumentParser:
     modpack_removed = sub.add_parser("modpack-removed", help="Show deleted MO2 modpack files that will be cleaned on clients")
     modpack_removed.add_argument("--path", help="Override project/repo path")
     modpack_removed.set_defaults(func=command_modpack_removed)
+
+    modpack_folder = sub.add_parser("modpack-folder", help="Publish one top-level MO2 mod folder as a separate package")
+    add_common(modpack_folder)
+    modpack_folder.add_argument("--folder", required=True, help="Top-level folder inside the MO2 mods repository")
+    modpack_folder.add_argument("--mode", choices=["standard", "full"], default="standard", help="Package configs/scripts/textures only or the full folder")
+    modpack_folder.set_defaults(func=command_modpack_folder)
 
     source = sub.add_parser("source", help="Commit and push Anthology source update")
     add_common(source)

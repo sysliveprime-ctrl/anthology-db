@@ -1,11 +1,13 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Small GUI control panel for Anthology release operations."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import queue
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,15 +15,39 @@ import threading
 import time
 import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox, scrolledtext, simpledialog, ttk
+from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
 
 
-WORKGIT_DIR = Path(r"E:\dev\Anthology-Work-Git")
+WORKGIT_DIR = Path(
+    os.environ.get("ANTHOLOGY_WORKGIT_DIR", str(Path(__file__).resolve().parents[3]))
+)
+GAME_ROOT = Path(
+    os.environ.get(
+        "ANTHOLOGY_GAME_ROOT",
+        r"X:\S.T.A.L.K.E.R\A.N.T.H.O.L.O.G.Y\ANTHOLOGY",
+    )
+)
 HELPER = WORKGIT_DIR / "skills" / "anthology-release-ops" / "scripts" / "anthology_release_ops.py"
 LAUNCHER_DIR = WORKGIT_DIR / "projects" / "AnthologyLauncher"
-MODPACK_DIR = Path(r"D:\Games\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods")
-ENGINE_DIR = Path(r"E:\dev\xray-monolith")
-LIVE_GAME_DIR = Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1")
+MODPACK_DIR = Path(
+    os.environ.get(
+        "ANTHOLOGY_MODPACK_DIR",
+        str(GAME_ROOT / "SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT" / "mods"),
+    )
+)
+ENGINE_DIR = Path(
+    os.environ.get(
+        "ANTHOLOGY_ENGINE_DIR",
+        str(WORKGIT_DIR.parent.parent / "projects" / "xray-monolith"),
+    )
+)
+UPDATE_RULES_FILE = LAUNCHER_DIR / "assets" / "update_rules.json"
+LIVE_GAME_DIR = Path(
+    os.environ.get(
+        "ANTHOLOGY_LIVE_GAME_DIR",
+        str(GAME_ROOT / "Anomaly-1.5.3-Anthology 2.1"),
+    )
+)
 DB_SOURCE_DIRS = {
     "configs": LIVE_GAME_DIR / "db" / "configs",
     "mods": LIVE_GAME_DIR / "db" / "mods",
@@ -35,6 +61,66 @@ DB_SOURCE_FILES = {
 DB_EXCLUDED_REL_PATHS = {
     "db/mods/00_modded_exes_gamedata.db0",
 }
+
+
+def read_update_rules() -> dict:
+    if not UPDATE_RULES_FILE.exists():
+        return {"mo2": {"allowed_parts": ["configs", "scripts", "textures"], "managed_full_folders": []}, "db": {"source_dirs": {}, "source_files": {}, "excluded_rel_paths": []}}
+    return json.loads(UPDATE_RULES_FILE.read_text(encoding="utf-8-sig"))
+
+
+def write_update_rules(data: dict) -> None:
+    data.setdefault("mo2", {}).setdefault("allowed_parts", ["configs", "scripts", "textures"])
+    data.setdefault("mo2", {}).setdefault("managed_standard_folders", [])
+    data.setdefault("mo2", {}).setdefault("managed_full_folders", [])
+    data.setdefault("db", {}).setdefault("source_dirs", {})
+    data.setdefault("db", {}).setdefault("source_files", {})
+    data.setdefault("db", {}).setdefault("removed_files", [])
+    data.setdefault("db", {}).setdefault("excluded_rel_paths", ["db/mods/00_modded_exes_gamedata.db0"])
+    UPDATE_RULES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    UPDATE_RULES_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def mo2_folder_from_path(value: str) -> str:
+    path = Path(value.strip().strip('"'))
+    if not path:
+        return ""
+    try:
+        return path.relative_to(MODPACK_DIR).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def db_rel_from_source(path: Path) -> str:
+    db_root = LIVE_GAME_DIR / "db"
+    rel = path.relative_to(db_root).as_posix()
+    return f"db/{rel}"
+
+
+def ensure_full_folder_gitignore(folder: str) -> None:
+    gitignore = MODPACK_DIR / ".gitignore"
+    text = gitignore.read_text(encoding="utf-8-sig") if gitignore.exists() else ""
+    escaped = "".join(f"\\{char}" if char in "[]" else char for char in folder)
+    line = f"!{escaped}/**"
+    if line not in text.splitlines():
+        gitignore.write_text(text.rstrip() + "\n\n# Launcher-managed full-folder MO2 rule.\n" + line + "\n", encoding="utf-8")
+
+
+def ensure_standard_folder_gitignore(folder: str) -> None:
+    gitignore = MODPACK_DIR / ".gitignore"
+    text = gitignore.read_text(encoding="utf-8-sig") if gitignore.exists() else ""
+    escaped = "".join(f"\\{char}" if char in "[]" else char for char in folder)
+    lines = [
+        f"!{escaped}/",
+        f"!{escaped}/gamedata/",
+        f"!{escaped}/gamedata/configs/**",
+        f"!{escaped}/gamedata/scripts/**",
+        f"!{escaped}/gamedata/textures/**",
+    ]
+    existing = set(text.splitlines())
+    missing = [line for line in lines if line not in existing]
+    if missing:
+        gitignore.write_text(text.rstrip() + "\n\n# Launcher-managed standard MO2 rule.\n" + "\n".join(missing) + "\n", encoding="utf-8")
 
 COLORS = {
     "bg": "#0f1417",
@@ -75,14 +161,24 @@ def db_asset_name(rel_path: str) -> str:
 
 def live_db_files() -> dict[str, dict]:
     files: dict[str, dict] = {}
-    for folder, base in DB_SOURCE_DIRS.items():
-        if not base.exists():
+    missing_sources: list[str] = []
+    rules = read_update_rules().get("db", {})
+    source_dirs = dict(DB_SOURCE_DIRS)
+    source_dirs.update({key: Path(value) for key, value in rules.get("source_dirs", {}).items()})
+    source_files = dict(DB_SOURCE_FILES)
+    source_files.update({key: Path(value) for key, value in rules.get("source_files", {}).items()})
+    excluded = {path.casefold() for path in DB_EXCLUDED_REL_PATHS}
+    excluded.update(path.casefold() for path in rules.get("excluded_rel_paths", []))
+    removed = {str(path).replace("\\", "/").casefold() for path in rules.get("removed_files", [])}
+    for folder, base in source_dirs.items():
+        if not base.is_dir():
+            missing_sources.append(f"db/{folder}: {base}")
             continue
         for path in sorted(base.rglob("*")):
             if not path.is_file():
                 continue
             rel = (Path("db") / folder / path.relative_to(base)).as_posix()
-            if rel.casefold() in DB_EXCLUDED_REL_PATHS:
+            if rel.casefold() in excluded or rel.casefold() in removed:
                 continue
             files[rel] = {
                 "path": rel,
@@ -90,33 +186,46 @@ def live_db_files() -> dict[str, dict]:
                 "size": path.stat().st_size,
                 "sha256": sha256_file(path),
             }
-    for rel, path in DB_SOURCE_FILES.items():
-        if path.exists() and rel.casefold() not in DB_EXCLUDED_REL_PATHS:
-            files[rel] = {
-                "path": rel,
-                "asset_name": db_asset_name(rel),
-                "size": path.stat().st_size,
-                "sha256": sha256_file(path),
-            }
+    for rel, path in source_files.items():
+        key = rel.casefold()
+        if key in excluded or key in removed:
+            continue
+        if not path.is_file():
+            missing_sources.append(f"{rel}: {path}")
+            continue
+        files[rel] = {
+            "path": rel,
+            "asset_name": db_asset_name(rel),
+            "size": path.stat().st_size,
+            "sha256": sha256_file(path),
+        }
+    if missing_sources:
+        details = "\n".join(f"  - {item}" for item in missing_sources)
+        raise RuntimeError(
+            "DB publication is blocked because source paths are missing. "
+            "Fix update_rules.json:\n" + details
+        )
     return files
 
 
 def summarize_db_changes(manifest_path: Path) -> dict[str, list[str]]:
     current = {entry["path"]: entry for entry in read_json(manifest_path).get("files", [])}
     live = live_db_files()
+    rules = read_update_rules().get("db", {})
     added = sorted(set(live) - set(current))
     removed = sorted(set(current) - set(live))
+    rule_removed = sorted({str(path).replace("\\", "/") for path in rules.get("removed_files", [])}, key=str.casefold)
     changed = sorted(
         path
         for path in set(live) & set(current)
         if live[path].get("size") != current[path].get("size")
         or live[path].get("sha256") != current[path].get("sha256")
     )
-    return {"added": added, "changed": changed, "removed": removed}
+    return {"added": added, "changed": changed, "removed": removed, "rule_removed": rule_removed}
 
 
 def format_db_changes(changes: dict[str, list[str]], limit: int = 28) -> str:
-    labels = [("added", "Добавлено"), ("changed", "Изменено"), ("removed", "Удалено")]
+    labels = [("added", "Добавлено"), ("changed", "Изменено"), ("removed", "Удалено из манифеста"), ("rule_removed", "Будет удалено у игроков")]
     lines: list[str] = []
     remaining = limit
     for key, label in labels:
@@ -332,6 +441,100 @@ class MultilineDialog(tk.Toplevel):
         self.destroy()
 
 
+class SingleLineDialog(tk.Toplevel):
+    def __init__(self, parent: tk.Tk, title: str, label: str, initial: str = "") -> None:
+        super().__init__(parent)
+        self.title(title)
+        self.resizable(True, False)
+        self.configure(bg=COLORS["bg"])
+        self.result: str | None = None
+        self.transient(parent)
+        self.grab_set()
+
+        ttk.Label(self, text=label).pack(anchor="w", padx=12, pady=(12, 6))
+        self.value = tk.StringVar(value=initial)
+        self.entry = tk.Entry(
+            self,
+            textvariable=self.value,
+            width=86,
+            bg=COLORS["log_bg"],
+            fg=COLORS["log_text"],
+            insertbackground=COLORS["log_text"],
+            selectbackground="#245d55",
+            selectforeground="#ffffff",
+            relief="flat",
+            borderwidth=0,
+            font=("Segoe UI", 10),
+        )
+        self.entry.pack(fill="x", padx=12, pady=6)
+        self._bind_shortcuts()
+
+        buttons = ttk.Frame(self)
+        buttons.pack(fill="x", padx=12, pady=(6, 12))
+        ttk.Button(buttons, text="OK", command=self._ok).pack(side="right", padx=(6, 0))
+        ttk.Button(buttons, text="Cancel", command=self._cancel).pack(side="right")
+        ttk.Button(buttons, text="Вставить", command=self._paste).pack(side="left")
+        ttk.Button(buttons, text="Выделить всё", command=self._select_all).pack(side="left", padx=(6, 0))
+
+        self.bind("<Return>", lambda _event: self._ok())
+        self.bind("<Escape>", lambda _event: self._cancel())
+        self.geometry("720x138")
+        self.entry.focus_set()
+        self.entry.icursor("end")
+        self.wait_window(self)
+
+    def _bind_shortcuts(self) -> None:
+        for sequence in ("<Control-v>", "<Control-V>", "<Shift-Insert>"):
+            self.entry.bind(sequence, lambda _event: self._paste_event())
+        self.entry.bind("<<Paste>>", lambda _event: self._paste_event())
+        for sequence in ("<Control-a>", "<Control-A>"):
+            self.entry.bind(sequence, lambda _event: self._select_all_event())
+        self.entry.bind("<Control-KeyPress>", self._control_key_event)
+
+    def _control_key_event(self, event) -> str | None:
+        key = str(event.keysym).lower()
+        char = str(getattr(event, "char", "")).lower()
+        keycode = int(getattr(event, "keycode", 0) or 0)
+        if key in ("v", "м", "cyrillic_em") or char in ("v", "м") or keycode == 86:
+            return self._paste_event()
+        if key in ("a", "ф", "cyrillic_ef") or char in ("a", "ф") or keycode == 65:
+            return self._select_all_event()
+        return None
+
+    def _paste_event(self) -> str:
+        self._paste()
+        return "break"
+
+    def _select_all_event(self) -> str:
+        self._select_all()
+        return "break"
+
+    def _paste(self) -> None:
+        try:
+            value = self.clipboard_get()
+        except tk.TclError:
+            return
+        try:
+            self.entry.delete("sel.first", "sel.last")
+        except tk.TclError:
+            pass
+        self.entry.insert("insert", value)
+        self.entry.focus_set()
+
+    def _select_all(self) -> None:
+        self.entry.selection_range(0, "end")
+        self.entry.icursor("end")
+        self.entry.focus_set()
+
+    def _ok(self) -> None:
+        self.result = self.value.get().strip()
+        self.destroy()
+
+    def _cancel(self) -> None:
+        self.result = None
+        self.destroy()
+
+
 class ReleaseControl(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -341,6 +544,7 @@ class ReleaseControl(tk.Tk):
 
         self.queue: queue.Queue[tuple[str, str]] = queue.Queue()
         self.running = False
+        self.command_output: list[str] = []
         self.news_items: list[dict] = []
         self.news_items_en: list[dict] = []
         self.news_dirty = False
@@ -371,6 +575,7 @@ class ReleaseControl(tk.Tk):
         style.configure("Card.TLabel", background=COLORS["panel"], foreground=COLORS["text"])
         style.configure("Muted.TLabel", background=COLORS["bg"], foreground=COLORS["muted"])
         style.configure("CardMuted.TLabel", background=COLORS["panel"], foreground=COLORS["muted"])
+        style.configure("Status.TLabel", font=("Segoe UI Semibold", 10), background=COLORS["bg"], foreground=COLORS["accent"])
         style.configure("Title.TLabel", font=("Segoe UI Semibold", 17), background=COLORS["bg"], foreground=COLORS["accent"])
         style.configure("Version.TLabel", font=("Segoe UI Semibold", 10), background=COLORS["panel_2"], foreground=COLORS["text"], padding=(10, 5))
 
@@ -437,6 +642,12 @@ class ReleaseControl(tk.Tk):
             font=("Consolas", 10),
         )
         self.log.pack(fill="both", expand=True, padx=10, pady=10)
+        progress_row = ttk.Frame(log_frame)
+        progress_row.pack(fill="x", padx=10, pady=(0, 10))
+        self.command_status = tk.StringVar(value="Статус: готово")
+        ttk.Label(progress_row, textvariable=self.command_status, style="Status.TLabel", width=42, anchor="w").pack(side="left", padx=(0, 10))
+        self.command_progress = ttk.Progressbar(progress_row, mode="indeterminate", length=260)
+        self.command_progress.pack(side="left", fill="x", expand=True)
         self._build_text_context_menu()
         self._log("Готово. Нажми кнопку, выбери версию/заметки, проверь подтверждение.")
 
@@ -466,7 +677,24 @@ class ReleaseControl(tk.Tk):
         row.pack(fill="x", pady=(12, 0))
         ttk.Button(row, text="Git-статус", command=lambda: self.run_git_status(MODPACK_DIR)).pack(side="left", padx=(0, 8))
         ttk.Button(row, text="Что удалится", command=self.preview_modpack_removed).pack(side="left", padx=(0, 8))
-        ttk.Button(row, text="Опубликовать MO2", command=self.publish_mo2, style="Accent.TButton").pack(side="left")
+        ttk.Button(row, text="Опубликовать мод/фикс", command=self.publish_modpack_folder, style="Accent.TButton").pack(side="left", padx=(0, 8))
+        ttk.Button(row, text="Опубликовать весь MO2", command=self.publish_mo2, style="Accent.TButton").pack(side="left")
+
+        rules = ttk.Labelframe(tab, text="Правила заливки", padding=14)
+        rules.pack(fill="x", pady=(0, 14))
+        ttk.Label(rules, text="Настройки обновляемых MO2-папок и отдельных DB-файлов. После изменения правил выпусти новый лаунчер, потом контент.", style="CardMuted.TLabel").pack(anchor="w")
+        row = ttk.Frame(rules)
+        row.pack(fill="x", pady=(12, 0))
+        ttk.Button(row, text="Показать правила", command=self.show_update_rules).pack(side="left", padx=(0, 8))
+        ttk.Button(row, text="MO2 папка стандарт", command=self.add_mo2_standard_rule).pack(side="left", padx=(0, 8))
+        ttk.Button(row, text="MO2 папка целиком", command=self.add_mo2_full_rule).pack(side="left", padx=(0, 8))
+        ttk.Button(row, text="Убрать MO2 правило", command=self.remove_mo2_rule).pack(side="left", padx=(0, 8))
+        ttk.Button(row, text="Удалить MO2 файл", command=self.delete_mo2_file, style="Danger.TButton").pack(side="left", padx=(0, 8))
+        ttk.Button(row, text="Удалить MO2 папку", command=self.delete_mo2_folder, style="Danger.TButton").pack(side="left")
+        row = ttk.Frame(rules)
+        row.pack(fill="x", pady=(8, 0))
+        ttk.Button(row, text="Добавить DB файл", command=self.add_db_file_rule).pack(side="left", padx=(0, 8))
+        ttk.Button(row, text="Убрать DB файл", command=self.remove_db_file_rule).pack(side="left", padx=(0, 8))
 
         db = ttk.Labelframe(tab, text="DB / Work Git", padding=14)
         db.pack(fill="x")
@@ -871,6 +1099,135 @@ class ReleaseControl(tk.Tk):
         for root in (WORKGIT_DIR, LAUNCHER_DIR, MODPACK_DIR, ENGINE_DIR):
             self.run_git_status(root)
 
+    def show_update_rules(self) -> None:
+        self._log(json.dumps(read_update_rules(), ensure_ascii=False, indent=2))
+
+    def add_mo2_standard_rule(self) -> None:
+        selected = filedialog.askdirectory(initialdir=str(MODPACK_DIR), title="Выбери MO2 папку для стандартной заливки")
+        if not selected:
+            return
+        folder = mo2_folder_from_path(selected)
+        data = read_update_rules()
+        rules = data.setdefault("mo2", {})
+        values = set(rules.setdefault("managed_standard_folders", []))
+        values.add(folder)
+        rules["managed_standard_folders"] = sorted(values, key=str.casefold)
+        write_update_rules(data)
+        ensure_standard_folder_gitignore(folder)
+        self._log(f"MO2 standard rule added: {folder}")
+
+    def add_mo2_full_rule(self) -> None:
+        selected = filedialog.askdirectory(initialdir=str(MODPACK_DIR), title="Выбери MO2 папку для полной заливки")
+        if not selected:
+            return
+        folder = mo2_folder_from_path(selected)
+        data = read_update_rules()
+        rules = data.setdefault("mo2", {})
+        values = set(rules.setdefault("managed_full_folders", []))
+        values.add(folder)
+        rules["managed_full_folders"] = sorted(values, key=str.casefold)
+        write_update_rules(data)
+        ensure_full_folder_gitignore(folder)
+        self._log(f"MO2 full-folder rule added: {folder}")
+
+    def remove_mo2_rule(self) -> None:
+        folder = filedialog.askdirectory(initialdir=str(MODPACK_DIR), title="Выбери MO2 папку, для которой убрать правило")
+        if not folder:
+            return
+        folder = mo2_folder_from_path(folder)
+        data = read_update_rules()
+        rules = data.setdefault("mo2", {})
+        removed = False
+        for key in ("managed_standard_folders", "managed_full_folders"):
+            values = rules.setdefault(key, [])
+            kept = [value for value in values if value.casefold() != folder.casefold()]
+            removed = removed or len(kept) != len(values)
+            rules[key] = kept
+        write_update_rules(data)
+        self._log(f"MO2 rule removed: {folder}" if removed else f"MO2 rule not found: {folder}")
+
+    def delete_mo2_file(self) -> None:
+        selected = filedialog.askopenfilename(initialdir=str(MODPACK_DIR), title="Выбери MO2 файл для удаления")
+        if not selected:
+            return
+        self._delete_mo2_path(Path(selected), expect_dir=False)
+
+    def delete_mo2_folder(self) -> None:
+        selected = filedialog.askdirectory(initialdir=str(MODPACK_DIR), title="Выбери MO2 папку для удаления")
+        if not selected:
+            return
+        self._delete_mo2_path(Path(selected), expect_dir=True)
+
+    def _delete_mo2_path(self, path: Path, expect_dir: bool) -> None:
+        try:
+            resolved = path.resolve()
+            root = MODPACK_DIR.resolve()
+            if not resolved.is_relative_to(root):
+                messagebox.showerror("MO2 delete", f"Путь вне модпака:\n{resolved}")
+                return
+            if expect_dir and not resolved.is_dir():
+                messagebox.showerror("MO2 delete", f"Это не папка:\n{resolved}")
+                return
+            if not expect_dir and not resolved.is_file():
+                messagebox.showerror("MO2 delete", f"Это не файл:\n{resolved}")
+                return
+            rel = resolved.relative_to(root).as_posix()
+            if not messagebox.askyesno("MO2 delete", f"Удалить локально?\n\n{rel}\n\nСледующий MO2 релиз удалит это у игроков через removed_files."):
+                return
+            if expect_dir:
+                shutil.rmtree(resolved)
+            else:
+                resolved.unlink()
+            self._log(f"MO2 deleted locally: {rel}")
+        except Exception as exc:
+            messagebox.showerror("MO2 delete", str(exc))
+
+    def add_db_file_rule(self) -> None:
+        selected = filedialog.askopenfilenames(initialdir=str(LIVE_GAME_DIR / "db"), title="Выбери DB файл(ы) для заливки")
+        if not selected:
+            return
+        data = read_update_rules()
+        db = data.setdefault("db", {})
+        source_files = db.setdefault("source_files", {})
+        removed = set(db.setdefault("removed_files", []))
+        added = []
+        for item in selected:
+            path = Path(item)
+            try:
+                rel = db_rel_from_source(path)
+            except ValueError:
+                messagebox.showerror("DB rule", f"Файл должен быть внутри:\n{LIVE_GAME_DIR / 'db'}\n\n{path}")
+                continue
+            source_files[rel] = str(path)
+            removed.discard(rel)
+            added.append(rel)
+        db["removed_files"] = sorted(removed, key=str.casefold)
+        write_update_rules(data)
+        self._log("DB file rule added:\n" + "\n".join(f"  {rel}" for rel in added))
+
+    def remove_db_file_rule(self) -> None:
+        selected = filedialog.askopenfilenames(initialdir=str(LIVE_GAME_DIR / "db"), title="Выбери DB файл(ы), которые убрать из заливки")
+        if not selected:
+            return
+        data = read_update_rules()
+        db = data.setdefault("db", {})
+        source_files = db.setdefault("source_files", {})
+        removed = set(db.setdefault("removed_files", []))
+        removed_now = []
+        for item in selected:
+            path = Path(item)
+            try:
+                rel = db_rel_from_source(path)
+            except ValueError:
+                messagebox.showerror("DB rule", f"Файл должен быть внутри:\n{LIVE_GAME_DIR / 'db'}\n\n{path}")
+                continue
+            source_files.pop(rel, None)
+            removed.add(rel)
+            removed_now.append(rel)
+        db["removed_files"] = sorted(removed, key=str.casefold)
+        write_update_rules(data)
+        self._log("DB file rule removed and marked for player deletion:\n" + "\n".join(f"  {rel}" for rel in removed_now))
+
     def preview_modpack_removed(self) -> None:
         self.run_command([sys.executable, str(HELPER), "modpack-removed"], WORKGIT_DIR, title="MO2 removed_files preview")
 
@@ -884,6 +1241,74 @@ class ReleaseControl(tk.Tk):
         if not self.confirm_publish_mo2(version):
             return
         self.run_command([sys.executable, str(HELPER), "modpack", "--version", version, "--notes", notes], WORKGIT_DIR, title=f"Publish MO2 {version}")
+
+    def publish_modpack_folder(self) -> None:
+        selected_value = filedialog.askdirectory(
+            initialdir=str(MODPACK_DIR),
+            title="Выбери одну верхнеуровневую папку мода/фикса",
+        )
+        if not selected_value:
+            return
+        selected = Path(selected_value).resolve()
+        try:
+            relative = selected.relative_to(MODPACK_DIR.resolve())
+        except ValueError:
+            messagebox.showerror("Мод/фикс", f"Папка должна находиться внутри:\n{MODPACK_DIR}")
+            return
+        if len(relative.parts) != 1 or not selected.is_dir():
+            messagebox.showerror("Мод/фикс", "Выбери верхнеуровневую папку непосредственно внутри MO2 mods.")
+            return
+
+        full = messagebox.askyesnocancel(
+            "Режим отдельного пакета",
+            "Что включить в отдельный пакет?\n\n"
+            "Да — всю папку целиком.\n"
+            "Нет — только gamedata/configs, gamedata/scripts и gamedata/textures.\n"
+            "Отмена — ничего не делать.",
+        )
+        if full is None:
+            return
+        mode = "full" if full else "standard"
+        version = self.ask_version("мода/фикса")
+        if not version:
+            return
+        notes = self.ask_notes("Заметки отдельного мода/фикса", f"Обновление {relative.as_posix()}.")
+        if notes is None:
+            return
+        status = self.capture(
+            ["git", "-c", "core.quotePath=false", "status", "--short", "--", relative.as_posix()],
+            MODPACK_DIR,
+        )
+        mode_label = "папка целиком" if mode == "full" else "configs/scripts/textures"
+        message = (
+            f"Опубликовать отдельный мод/фикс?\n\n"
+            f"Папка:\n{relative.as_posix()}\n\n"
+            f"Версия: {version}\n"
+            f"Режим: {mode_label}\n\n"
+            f"Изменения выбранной папки:\n{status or '(Git не видит изменений)'}\n\n"
+            "Будет создан отдельный ZIP. В commit попадут только выбранная папка и version.json. "
+            "Остальные локальные изменения не будут добавлены.\n\n"
+            "Важно: игрокам сначала нужен лаунчер с поддержкой отдельных пакетов."
+        )
+        if not messagebox.askyesno("Подтверждение отдельного пакета", message):
+            return
+        self.run_command(
+            [
+                sys.executable,
+                str(HELPER),
+                "modpack-folder",
+                "--folder",
+                str(selected),
+                "--mode",
+                mode,
+                "--version",
+                version,
+                "--notes",
+                notes,
+            ],
+            WORKGIT_DIR,
+            title=f"Publish folder package {relative.as_posix()} {version}",
+        )
 
     def publish_db(self) -> None:
         version = self.ask_version("DB")
@@ -1264,7 +1689,7 @@ class ReleaseControl(tk.Tk):
 
     def check_launcher_public(self) -> None:
         script = (
-            "$m=Invoke-RestMethod -Uri 'https://raw.githubusercontent.com/sysliveprime-ctrl/AnthologyLauncher/main/launcher_version.json?t=' + [DateTimeOffset]::Now.ToUnixTimeSeconds(); "
+            "$m=Invoke-RestMethod -Uri ('https://raw.githubusercontent.com/sysliveprime-ctrl/AnthologyLauncher/main/launcher_version.json?t=' + ([DateTimeOffset]::Now).ToUnixTimeSeconds()); "
             "$out=Join-Path $env:TEMP 'AnomalyLauncher_gui_check.exe'; "
             "Invoke-WebRequest -Uri $m.exe_url -OutFile $out -UseBasicParsing; "
             "$i=Get-Item $out; $h=(Get-FileHash -Algorithm SHA256 $out).Hash; "
@@ -1339,27 +1764,50 @@ class ReleaseControl(tk.Tk):
             messagebox.showwarning("Задача выполняется", "Дождись завершения текущей операции.")
             return
         self.running = True
+        self.command_output = []
+        self.command_status.set(f"Статус: выполняется - {title or 'команда'}")
+        self.command_progress.start(12)
         self._log("\n" + "=" * 80)
         self._log(title or "Команда")
         self._log("+ " + " ".join(args))
 
         def work() -> None:
             try:
-                result = subprocess.run(args, cwd=str(cwd), text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                output = result.stdout or ""
-                self.queue.put(("log", output.rstrip()))
-                if result.returncode == 0:
+                env = os.environ.copy()
+                env["PYTHONUNBUFFERED"] = "1"
+                env["PYTHONUTF8"] = "1"
+                process = subprocess.Popen(
+                    args,
+                    cwd=str(cwd),
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    bufsize=1,
+                    env=env,
+                )
+                assert process.stdout is not None
+                for line in process.stdout:
+                    self.command_output.append(line)
+                    text = line.rstrip()
+                    if text:
+                        self.queue.put(("log", text))
+                returncode = process.wait()
+                output = "".join(self.command_output)
+                if returncode == 0:
                     self.queue.put(("done", "OK"))
                     if on_success:
                         self.queue.put(("callback", on_success))
                         self.queue.put(("callback_arg", output))
                 else:
-                    self.queue.put(("error", f"Команда завершилась с кодом {result.returncode}"))
+                    tail = "\n".join(output.strip().splitlines()[-18:])
+                    detail = f"Команда завершилась с кодом {returncode}"
+                    if tail:
+                        detail += "\n\nПоследний вывод:\n" + tail
+                    self.queue.put(("error", detail))
             except Exception as exc:
                 self.queue.put(("error", str(exc)))
 
         threading.Thread(target=work, daemon=True).start()
-
     def _drain_queue(self) -> None:
         callback = None
         while True:
@@ -1374,10 +1822,14 @@ class ReleaseControl(tk.Tk):
                 self.version_vars[key].set(text)
             elif kind == "done":
                 self.running = False
+                self.command_progress.stop()
+                self.command_status.set("Статус: готово")
                 self._log("Готово.")
                 self.refresh_versions()
             elif kind == "error":
                 self.running = False
+                self.command_progress.stop()
+                self.command_status.set("Статус: ошибка")
                 self._log("ОШИБКА: " + value)
                 messagebox.showerror("Ошибка", value)
             elif kind == "callback":
@@ -1404,7 +1856,6 @@ def main() -> int:
         app.after(500, app.destroy)
     app.mainloop()
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
