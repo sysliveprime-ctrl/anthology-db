@@ -1,7 +1,7 @@
 {
-  "version": "2026.06.29.5",
+  "version": "2026.06.30.1",
   "mode": "mirror",
-  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.29.5/",
+  "base_url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.30.1/",
   "files": [
     {
       "path": "db/configs/ai.db0",
@@ -20,8 +20,8 @@
     {
       "path": "db/configs/configs_anthology.xdb0",
       "asset_name": "db_configs_configs_anthology.xdb0",
-      "size": 12923045,
-      "sha256": "299dcc87ddc6650d499c576a99057f83e8a40707d45a5cede2faa42425d3c786"
+      "size": 13064259,
+      "sha256": "ce47c3a99bab87074a16db490cf16d2a56e20d556ee7b8fae633e4dd7a90c71a"
     },
     {
       "path": "db/configs/configs_deanon_artefact.xdb0",
@@ -212,9 +212,6 @@
       "url": "https://github.com/sysliveprime-ctrl/anthology-db/releases/download/2026.06.07.1/db_textures_textures_trees.xdb3"
     }
   ],
-  "notes": "Восстановление DB из живой Anthology после ошибочного mirror-манифеста 2026.06.29.4.",
-  "removed_files": [
-    "db/mods/zhopa.xdb0",
-    "db/textures/textures_actors_gnra.xdb1"
-  ]
+  "notes": "Обновление DB Anthology.",
+  "removed_files": []
 }
