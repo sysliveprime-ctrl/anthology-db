@@ -21,20 +21,24 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
-WORKGIT_DIR = Path(r"E:\dev\Anthology-Work-Git")
-HELPER = WORKGIT_DIR / "skills" / "anthology-release-ops" / "scripts" / "anthology_release_ops.py"
-LAUNCHER_DIR = WORKGIT_DIR / "projects" / "AnthologyLauncher"
-MODPACK_DIR = Path(r"D:\Games\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods")
-ENGINE_DIR = Path(r"E:\dev\xray-monolith")
+def configured_path(env_name: str, default: str | Path) -> Path:
+    return Path(os.environ.get(env_name, str(default)))
+
+
+WORKGIT_DIR = configured_path("ANTHOLOGY_WORKGIT_DIR", r"F:\Editor_Stalker\Anthology-Work-Git")
+HELPER = configured_path("ANTHOLOGY_RELEASE_HELPER", WORKGIT_DIR / "skills" / "anthology-release-ops" / "scripts" / "anthology_release_ops.py")
+LAUNCHER_DIR = configured_path("ANTHOLOGY_LAUNCHER_DIR", WORKGIT_DIR / "projects" / "AnthologyLauncher")
+MODPACK_DIR = configured_path("ANTHOLOGY_MODPACK_DIR", r"D:\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods")
+ENGINE_DIR = configured_path("ANTHOLOGY_ENGINE_DIR", WORKGIT_DIR / "projects" / "xray-monolith")
 ENGINE_BRANCH = "anthology-2026.5.8-mt-nanfix"
 ENGINE_REPO = "sysliveprime-ctrl/xray-monolith"
-ENGINE_BUILD_SCRIPT = Path(r"E:\dev\anomaly-codex-main\tools\build_anthology_engine.ps1")
-LIVE_GAME_DIR = Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1")
+ENGINE_BUILD_SCRIPT = configured_path("ANTHOLOGY_ENGINE_BUILD_SCRIPT", WORKGIT_DIR / "tools" / "build_anthology_engine.ps1")
+LIVE_GAME_DIR = configured_path("ANTHOLOGY_LIVE_GAME_DIR", r"D:\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1")
 LIVE_BIN_DIR = LIVE_GAME_DIR / "bin"
 LIVE_ENGINE_DB = LIVE_GAME_DIR / "db" / "mods" / "00_modded_exes_gamedata.db0"
 DB_SOURCE_DIRS = {
-    "configs": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs"),
-    "mods": Path(r"D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods"),
+    "configs": LIVE_GAME_DIR / "db" / "configs",
+    "mods": LIVE_GAME_DIR / "db" / "mods",
 }
 DB_SOURCE_FILES = {
     "db/shaders_anthology.xdb0": LIVE_GAME_DIR / "db" / "shaders_anthology.xdb0",
@@ -98,6 +102,21 @@ def run(args: list[str], cwd: Path | None = None, capture: bool = False) -> str:
 
 def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def read_version(path: Path, fallback: str = "not configured") -> str:
+    try:
+        return str(read_json(path).get("version", fallback))
+    except (FileNotFoundError, NotADirectoryError):
+        return fallback
+
+
+def require_engine_repo() -> None:
+    if not (ENGINE_DIR / ".git").exists() or not (ENGINE_DIR / "engine_version.json").exists():
+        raise PublishError(
+            f"MT engine repo is not configured: {ENGINE_DIR}. "
+            "Set ANTHOLOGY_ENGINE_DIR or clone sysliveprime-ctrl/xray-monolith before using engine actions."
+        )
 
 
 def sha256_file(path: Path) -> str:
@@ -174,10 +193,10 @@ def card_row(label: str, value: str, color: str = RESET) -> None:
 
 
 def current_versions() -> tuple[str, str, str, str]:
-    launcher_current = read_json(LAUNCHER_DIR / "launcher_version.json").get("version", "0.0.0.0")
-    db_current = read_json(WORKGIT_DIR / "db_version.json").get("version", "0.0.0.0")
-    mo2_current = read_json(MODPACK_DIR / "version.json").get("version", "0.0.0.0")
-    engine_current = read_json(ENGINE_DIR / "engine_version.json").get("version", "0.0.0.0")
+    launcher_current = read_version(LAUNCHER_DIR / "launcher_version.json", "0.0.0.0")
+    db_current = read_version(WORKGIT_DIR / "db_version.json", "0.0.0.0")
+    mo2_current = read_version(MODPACK_DIR / "version.json", "0.0.0.0")
+    engine_current = read_version(ENGINE_DIR / "engine_version.json")
     return launcher_current, db_current, mo2_current, engine_current
 
 
@@ -677,6 +696,7 @@ def write_json(path: Path, data: dict) -> None:
 
 
 def publish_engine(version: str, notes: str, yes: bool, dry_run: bool, skip_build: bool) -> None:
+    require_engine_repo()
     run(["git", "fetch", "origin", ENGINE_BRANCH, "--prune"], cwd=ENGINE_DIR)
     branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ENGINE_DIR, capture=True).strip()
     if branch != ENGINE_BRANCH:
@@ -728,6 +748,7 @@ def publish_engine(version: str, notes: str, yes: bool, dry_run: bool, skip_buil
 
 
 def retry_engine_asset_upload(version: str, yes: bool, dry_run: bool) -> None:
+    require_engine_repo()
     run(["git", "fetch", "origin", ENGINE_BRANCH, "--prune"], cwd=ENGINE_DIR)
     branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ENGINE_DIR, capture=True).strip()
     if branch != ENGINE_BRANCH:

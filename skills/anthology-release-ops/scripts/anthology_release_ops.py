@@ -20,34 +20,15 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
-WORKGIT_DIR = Path(
-    os.environ.get("ANTHOLOGY_WORKGIT_DIR", str(Path(__file__).resolve().parents[3]))
-)
-GAME_ROOT = Path(
-    os.environ.get(
-        "ANTHOLOGY_GAME_ROOT",
-        r"X:\S.T.A.L.K.E.R\A.N.T.H.O.L.O.G.Y\ANTHOLOGY",
-    )
-)
-LAUNCHER_DIR = WORKGIT_DIR / "projects" / "AnthologyLauncher"
-MODPACK_DIR = Path(
-    os.environ.get(
-        "ANTHOLOGY_MODPACK_DIR",
-        str(GAME_ROOT / "SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT" / "mods"),
-    )
-)
-SOURCE_DIR = Path(
-    os.environ.get(
-        "ANTHOLOGY_SOURCE_DIR",
-        str(WORKGIT_DIR.parent.parent / "ai_workspace" / "Source_Anthology"),
-    )
-)
-LIVE_GAME_DIR = Path(
-    os.environ.get(
-        "ANTHOLOGY_LIVE_GAME_DIR",
-        str(GAME_ROOT / "Anomaly-1.5.3-Anthology 2.1"),
-    )
-)
+def configured_path(env_name: str, default: str | Path) -> Path:
+    return Path(os.environ.get(env_name, str(default)))
+
+
+WORKGIT_DIR = configured_path("ANTHOLOGY_WORKGIT_DIR", r"F:\Editor_Stalker\Anthology-Work-Git")
+LAUNCHER_DIR = configured_path("ANTHOLOGY_LAUNCHER_DIR", WORKGIT_DIR / "projects" / "AnthologyLauncher")
+MODPACK_DIR = configured_path("ANTHOLOGY_MODPACK_DIR", r"D:\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods")
+SOURCE_DIR = configured_path("ANTHOLOGY_SOURCE_DIR", WORKGIT_DIR / "projects" / "anthology-source")
+LIVE_GAME_DIR = configured_path("ANTHOLOGY_LIVE_GAME_DIR", r"D:\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1")
 DB_DIR = WORKGIT_DIR
 UPDATE_RULES_FILE = LAUNCHER_DIR / "assets" / "update_rules.json"
 

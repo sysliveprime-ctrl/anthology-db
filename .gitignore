@@ -6,3 +6,6 @@ dist/
 *.zip
 projects/AnthologyLauncher/
 safe_backups/
+
+projects/anthology-source/
+projects/xray-monolith/

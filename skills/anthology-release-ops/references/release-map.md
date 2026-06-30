@@ -2,7 +2,7 @@
 
 ## Launcher
 
-- Root: `E:\dev\Anthology-Work-Git\projects\AnthologyLauncher`
+- Root: `F:\Editor_Stalker\Anthology-Work-Git\projects\AnthologyLauncher`
 - Repo: `sysliveprime-ctrl/AnthologyLauncher`
 - Runtime version source: `anthology_launcher.py`, `LAUNCHER_VERSION`
 - Update manifest: `launcher_version.json`
@@ -11,7 +11,7 @@
 
 ## MO2 Modpack
 
-- Root: `D:\Games\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods`
+- Root: `D:\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods`
 - Repo: `sysliveprime-ctrl/anthology-mo2-modpack`
 - Manifest: `version.json`
 - Download mode: GitHub branch zip from `main`
@@ -24,20 +24,20 @@
 
 ## Anthology Source
 
-- Root: `E:\dev\anomaly-codex-main\ai_workspace\Source_Anthology`
+- Root: `F:\Editor_Stalker\Anthology-Work-Git\projects\anthology-source`
 - Repo: `sysliveprime-ctrl/anthology-source`
 - Scope: tracked source snapshot, mainly `gamedata/configs` and `gamedata/scripts`
 - Delivery: plain git push, no launcher build, no update manifest, no release asset.
 
 ## Anthology Work Git
 
-- Root: `E:\dev\Anthology-Work-Git`
+- Root: `F:\Editor_Stalker\Anthology-Work-Git`
 - Repo: `sysliveprime-ctrl/anthology-db`
 - Manifest: `db_version.json`
 - Asset sources:
-  - `D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs`
-  - `D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods`
-  - `D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0`
+  - `D:\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs`
+  - `D:\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods`
+  - `D:\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0`
 - Manifest paths stay logical: `db/configs/...`, `db/mods/...`,
   `db/shaders_anthology.xdb0`
 - `db/mods/00_modded_exes_gamedata.db0` is engine-owned and must not be added

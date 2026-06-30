@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Small GUI control panel for Anthology release operations."""
 
 from __future__ import annotations
@@ -18,36 +18,17 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
 
 
-WORKGIT_DIR = Path(
-    os.environ.get("ANTHOLOGY_WORKGIT_DIR", str(Path(__file__).resolve().parents[3]))
-)
-GAME_ROOT = Path(
-    os.environ.get(
-        "ANTHOLOGY_GAME_ROOT",
-        r"X:\S.T.A.L.K.E.R\A.N.T.H.O.L.O.G.Y\ANTHOLOGY",
-    )
-)
-HELPER = WORKGIT_DIR / "skills" / "anthology-release-ops" / "scripts" / "anthology_release_ops.py"
-LAUNCHER_DIR = WORKGIT_DIR / "projects" / "AnthologyLauncher"
-MODPACK_DIR = Path(
-    os.environ.get(
-        "ANTHOLOGY_MODPACK_DIR",
-        str(GAME_ROOT / "SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT" / "mods"),
-    )
-)
-ENGINE_DIR = Path(
-    os.environ.get(
-        "ANTHOLOGY_ENGINE_DIR",
-        str(WORKGIT_DIR.parent.parent / "projects" / "xray-monolith"),
-    )
-)
+def configured_path(env_name: str, default: str | Path) -> Path:
+    return Path(os.environ.get(env_name, str(default)))
+
+
+WORKGIT_DIR = configured_path("ANTHOLOGY_WORKGIT_DIR", r"F:\Editor_Stalker\Anthology-Work-Git")
+HELPER = configured_path("ANTHOLOGY_RELEASE_HELPER", WORKGIT_DIR / "skills" / "anthology-release-ops" / "scripts" / "anthology_release_ops.py")
+LAUNCHER_DIR = configured_path("ANTHOLOGY_LAUNCHER_DIR", WORKGIT_DIR / "projects" / "AnthologyLauncher")
+MODPACK_DIR = configured_path("ANTHOLOGY_MODPACK_DIR", r"D:\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods")
+ENGINE_DIR = configured_path("ANTHOLOGY_ENGINE_DIR", WORKGIT_DIR / "projects" / "xray-monolith")
 UPDATE_RULES_FILE = LAUNCHER_DIR / "assets" / "update_rules.json"
-LIVE_GAME_DIR = Path(
-    os.environ.get(
-        "ANTHOLOGY_LIVE_GAME_DIR",
-        str(GAME_ROOT / "Anomaly-1.5.3-Anthology 2.1"),
-    )
-)
+LIVE_GAME_DIR = configured_path("ANTHOLOGY_LIVE_GAME_DIR", r"D:\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1")
 DB_SOURCE_DIRS = {
     "configs": LIVE_GAME_DIR / "db" / "configs",
     "mods": LIVE_GAME_DIR / "db" / "mods",
@@ -950,13 +931,15 @@ class ReleaseControl(tk.Tk):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8-sig"))
                     self.queue.put(("version", f"{key}|{label}: {data.get('version', '?')}"))
+                except FileNotFoundError:
+                    fallback = "not configured" if key == "engine" else "missing"
+                    self.queue.put(("version", f"{key}|{label}: {fallback}"))
                 except Exception as exc:
-                    self.queue.put(("version", f"{key}|{label}: ошибка ({exc})"))
+                    self.queue.put(("version", f"{key}|{label}: error ({exc})"))
             if refresh_news:
                 self.queue.put(("call", "refresh_news_silent"))
 
         threading.Thread(target=work, daemon=True).start()
-
     def refresh_news(self) -> None:
         has_draft_changes = self.news_dirty or self.news_form_differs_from_index(self.news_selected_index)
         if has_draft_changes and not messagebox.askyesno("Новости", "В черновике есть неопубликованные изменения.\n\nСбросить их и заново загрузить новости из лаунчера?"):
@@ -1859,3 +1842,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

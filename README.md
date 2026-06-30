@@ -53,9 +53,9 @@ Git игрокам не нужен.
 Манифест собирается не из репозитория, а из живой папки игры:
 
 ```text
-D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs
-D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods
-D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0
+D:\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\configs
+D:\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\mods
+D:\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0
 ```
 
 `db/mods/00_modded_exes_gamedata.db0` поставляется через engine update ZIP, а
@@ -64,7 +64,7 @@ D:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\db\shaders_anthology.xdb0
 ## Релиз DB
 
 ```powershell
-py -3 E:\dev\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_release_ops.py workgit --version YYYY.MM.DD.N --notes "Описание обновления"
+py -3 F:\Editor_Stalker\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_release_ops.py workgit --version YYYY.MM.DD.N --notes "Описание обновления"
 ```
 
 Скрипт:
@@ -78,10 +78,10 @@ py -3 E:\dev\Anthology-Work-Git\skills\anthology-release-ops\scripts\anthology_r
 ## Связанные Репозитории
 
 ```text
-launcher repo:  E:\dev\Anthology-Work-Git\projects\AnthologyLauncher
-modpack repo:   D:\Games\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods
-engine repo:    E:\dev\xray-monolith
-source repo:    E:\dev\anomaly-codex-main\ai_workspace\Source_Anthology
+launcher repo:  F:\Editor_Stalker\Anthology-Work-Git\projects\AnthologyLauncher
+modpack repo:   D:\ANTHOLOGY\SYS_A.N.T.H.O.L.O.G.Y_mo2_CBT\mods
+engine repo:    F:\Editor_Stalker\Anthology-Work-Git\projects\xray-monolith
+source repo:    F:\Editor_Stalker\Anthology-Work-Git\projects\anthology-source
 ```
 
 Публичные репозитории:
@@ -103,7 +103,7 @@ source repo:    E:\dev\anomaly-codex-main\ai_workspace\Source_Anthology
 skills\anthology-release-ops
 ```
 
-Не поддерживать отдельную копию под `C:\Users\parti\.codex\skills`. Там может
+Не поддерживать отдельную копию под `%USERPROFILE%\.codex\skills`. Там может
 быть только discovery pointer.
 
 ## Правила
